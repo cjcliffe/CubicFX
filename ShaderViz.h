@@ -10,10 +10,10 @@
 #define __CubicVR2__ShaderRenderTest__
 
 #include <iostream>
-#include "opengl/Shader.h"
-#include "opengl/Material.h"
-#include "core/Mesh.h"
-#include "core/Camera.h"
+#include "cubicvr2/opengl/Shader.h"
+#include "cubicvr2/opengl/Material.h"
+#include "cubicvr2/core/Mesh.h"
+#include "cubicvr2/core/Camera.h"
 #define GLFW_INCLUDE_GLCOREARB
 #include <GLFW/glfw3.h>
 #include <math.h>
@@ -24,7 +24,7 @@
 namespace CubicVR {
     
     
-    class ShaderRenderTest {
+    class ShaderViz {
     public:
         Shader testShader;
 //        static Material mat;
@@ -37,12 +37,16 @@ namespace CubicVR {
         shaderUniformFloat u_time;
         shaderUniformVec2 u_mouse;
         
+        shaderUniformFloatVector u_sampleData;
+        shaderUniformFloatVector u_vuData;
+        shaderUniformVec3 u_baseColor;
+        
         Mesh testMesh;
         float time_value;
         
 //        static GLuint vao;
         
-        void display(void)
+        void display(vector<float> &sample_data, vector<float> &vu_data)
         {
             // Clear frame buffer and depth buffer
             glClearColor(0.3f,0.3f,0.3f,1.0f);
@@ -67,6 +71,12 @@ namespace CubicVR {
             u_resolution.update();
             u_mouse.set(vec2(sinf(time_value/10.0f),cosf(time_value/12.0f)));
             u_mouse.update();
+            u_sampleData.set(&sample_data[0]);
+            u_sampleData.update();
+            u_vuData.set(&vu_data[0]);
+            u_vuData.update();
+//            u_sampleData.
+
             
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,testMesh.getVBO()->gl_elements);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, NULL);
@@ -76,14 +86,14 @@ namespace CubicVR {
         
         
         
-        void run(GLFWwindow *window) {
+        void init() {
             cout << "OpenGL Version: " << glGetString(GL_VERSION) << endl;
             cout << "Shader language version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << endl;
 
             
-            testShader.loadTextFile("shaders/vertex_common.vs", "shaders/greyscale_cube_matrix.fs");
+//            testShader.loadTextFile("shaders/vertex_common.vs", "shaders/greyscale_cube_matrix.fs");
 //            testShader.loadTextFile("shaders/vertex_common.vs", "shaders/raymarch_tunnel.fs");
-//            testShader.loadTextFile("shaders/vertex_common.vs", "shaders/rgb_flares_in_tunnel.fs");
+            testShader.loadTextFile("shaders/vertex_common.vs", "shaders/rgb_flares_in_tunnel.fs");
 //            testShader.loadTextFile("shaders/vertex_common.vs", "shaders/raymarch_clod.fs");
 //            testShader.loadTextFile("shaders/vertex_common.vs", "shaders/rm_box_floor.fs");
 //            testShader.loadTextFile("shaders/vertex_common.vs", "shaders/binary_tunnel.fs");
@@ -108,6 +118,10 @@ namespace CubicVR {
             u_time = shaderVars.getUniform("time");
             u_mouse = shaderVars.getUniform("mouse");
             
+            u_sampleData = shaderVars.getUniform("sampleData[0]");
+            u_vuData = shaderVars.getUniform("vuData[0]");
+            u_baseColor = shaderVars.getUniform("baseColor");
+            
 //            testCam.setDimensions(640,480);
 //            testCam.setFOV(60);
 //            testCam.setTarget(vec3(0,0,0));
@@ -125,15 +139,7 @@ namespace CubicVR {
             
             testMesh.prepare();
             
-            while (!glfwWindowShouldClose(window))
-            {
-                /* Render here */
-                
-                /* Swap front and back buffers and process events */
-                display();
-                glfwSwapBuffers(window);
-                glfwPollEvents();
-            }
+
 
 //            glGenVertexArrays(1, &vao);
 

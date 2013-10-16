@@ -6,6 +6,7 @@ out vec4 outputF;
 
 uniform float time;
 uniform vec2 resolution;
+uniform float vuData[128];
 
 const float PI = 3.1416;
 const float TWOPI = 2.0*PI; 
@@ -17,7 +18,7 @@ void main( void ) {
 	float multiplier = 0.0005;
 	const float step = 0.004;
 	const float loop = 100.0;
-	const float timeSCale = 0.75;
+	const float timeSCale = 0.55;
 	
 	vec3 blueGodColor = vec3(0.0);
 	for(float i=1.0;i<loop;i++){		
@@ -25,7 +26,7 @@ void main( void ) {
 		vec2 point = vec2(0.75*sin(t), 0.5*sin(t));
 		point += vec2(0.75*cos(t*4.0), 0.5*sin(t*3.0));
 		point /= 2.0;
-		float componentColor= multiplier/((uPos.x-point.x)*(uPos.x-point.x) + (uPos.y-point.y)*(uPos.y-point.y))/i;
+		float componentColor= (multiplier+0.02*vuData[1])/((uPos.x-point.x)*(uPos.x-point.x) + (uPos.y-point.y)*(uPos.y-point.y))/i;
 		blueGodColor += vec3(componentColor/3.0, componentColor/3.0, componentColor);
 	}
 	
@@ -35,7 +36,7 @@ void main( void ) {
 		vec2 point = vec2(0.5*sin(t*4.0+200.0), 0.75*sin(t+10.0));
 		point += vec2(0.85*cos(t*2.0), 0.45*sin(t*3.0));
 		point /= 2.0;
-		float componentColor= multiplier/((uPos.x-point.x)*(uPos.x-point.x) + (uPos.y-point.y)*(uPos.y-point.y))/i;
+		float componentColor= (multiplier+0.02*vuData[50])/((uPos.x-point.x)*(uPos.x-point.x) + (uPos.y-point.y)*(uPos.y-point.y))/i;
 		redGodColor += vec3(componentColor, componentColor/3.0, componentColor/3.0);
 	}
 	
@@ -45,7 +46,7 @@ void main( void ) {
 		vec2 point = vec2(0.75*sin(t*3.0+20.0), 0.45*sin(t*2.0+40.0));
 		point += vec2(0.35*cos(t*2.0+100.0), 0.5*sin(t*3.0));
 		point /= 2.0;
-		float componentColor= multiplier/((uPos.x-point.x)*(uPos.x-point.x) + (uPos.y-point.y)*(uPos.y-point.y))/i;
+		float componentColor= (multiplier+0.02*vuData[120])/((uPos.x-point.x)*(uPos.x-point.x) + (uPos.y-point.y)*(uPos.y-point.y))/i;
 		greenGodColor += vec3(componentColor/3.0, componentColor, componentColor/3.0);
 	}
 	

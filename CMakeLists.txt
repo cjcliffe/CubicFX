@@ -37,6 +37,7 @@ endmacro(configure_files_recurse)
 
 project (ShaderFX)
 
+
 SET( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 SET( CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${PROJECT_BINARY_DIR})
 SET( CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${PROJECT_BINARY_DIR})
@@ -46,15 +47,18 @@ include_directories(${PROJECT_SOURCE_DIR}/glfw-3.0.3/include)
 include_directories ( "${PROJECT_SOURCE_DIR}/../CubicVR-2/build/include" )
 link_directories ( "${PROJECT_SOURCE_DIR}/../CubicVR-2/build/lib" )
 
-SET (test_sources
+find_package (OpenAL)
+
+SET (shaderfx_sources
     main.cpp
-    ShaderRenderTest.cpp
-    ShaderTest.cpp
+    ShaderViz.cpp
+	BeatDetektor.cpp
 )
 
-SET (test_headers
-    ShaderRenderTest.h
-    ShaderTest.h
+SET (shaderfx_headers
+    ShaderViz.h
+	FFT.h
+	BeatDetektor.h
 )
 
 
@@ -63,9 +67,9 @@ configure_files(${PROJECT_SOURCE_DIR}/shaders ${PROJECT_BINARY_DIR}/shaders COPY
 configure_files(${PROJECT_SOURCE_DIR}/shaders ${PROJECT_BINARY_DIR}/shaders COPYONLY)
 
 
-add_executable(test ${test_sources} ${test_headers})
+add_executable(ShaderFX ${shaderfx_sources} ${shaderfx_headers})
 
-target_link_libraries(test cubicvr2 glfw ${GLFW_LIBRARIES})
+target_link_libraries(ShaderFX cubicvr2 glfw ${GLFW_LIBRARIES} ${OPENAL_LIBRARY})
 
 
 

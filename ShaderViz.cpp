@@ -6,7 +6,7 @@
 //  Copyright (c) 2013 Charles J. Cliffe. All rights reserved.
 //
 
-#include "ShaderRenderTest.h"
+#include "ShaderViz.h"
 
 using namespace CubicVR;
 
