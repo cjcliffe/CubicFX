@@ -202,7 +202,7 @@ int main(int argc, char * argv[])
             captureAudio();
             processBD();
             
-            viz.display(sample_data,vu->vu_levels);
+            viz.display(visTimer.getSeconds(),sample_data,vu->vu_levels,contest);
             glfwSwapBuffers(window);
             frameSlice = 0.0f;
         }
