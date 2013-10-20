@@ -181,9 +181,34 @@ int main(int argc, char * argv[])
     visTimer.start();
     fpsTimer.start();
     
-    ShaderViz viz;
+    vector<ShaderViz *> visualizers;
     
-    viz.init();
+    ShaderViz vizRgbFlares("shaders/vertex_common.vs", "shaders/rgb_flares_in_tunnel.fs");
+    ShaderViz rbCrawl("shaders/vertex_common.vs", "shaders/red_blue_crawl_pattern.fs");
+    ShaderViz rmTunnel("shaders/vertex_common.vs", "shaders/raymarch_tunnel.fs");
+    ShaderViz discoFloor("shaders/vertex_common.vs", "shaders/discofloor_ceiling.fs");
+    
+//    ShaderViz torusSwirl("shaders/vertex_common.vs", "shaders/torus_tunnel_swirl.fs");
+//    ShaderViz rmBoxFloor("shaders/vertex_common.vs", "shaders/rm_box_floor.fs");
+//    ShaderViz cubeMatrix("shaders/vertex_common.vs", "shaders/rm_cube_matrix.fs");
+//    ShaderViz rmCorridorBalls("shaders/vertex_common.vs", "shaders/rt_balls_corridor.fs");
+
+    
+    //            vizShader.loadTextFile("shaders/vertex_common.vs", "shaders/greyscale_cube_matrix.fs");
+    //            vizShader.loadTextFile("shaders/vertex_common.vs", "shaders/raymarch_clod.fs");
+    //            vizShader.loadTextFile("shaders/vertex_common.vs", "shaders/binary_tunnel.fs");
+    
+    visualizers.push_back(&vizRgbFlares);
+    visualizers.push_back(&rbCrawl);
+    visualizers.push_back(&rmTunnel);
+    visualizers.push_back(&discoFloor);
+
+//    visualizers.push_back(&torusSwirl);
+//    visualizers.push_back(&rmCorridorBalls);
+//    visualizers.push_back(&cubeMatrix);
+//    visualizers.push_back(&rmBoxFloor);
+    
+    ShaderViz *currentViz = &discoFloor;
     
     float frameSlice = 0.0f;
     
@@ -202,7 +227,9 @@ int main(int argc, char * argv[])
             captureAudio();
             processBD();
             
-            viz.display(visTimer.getSeconds(),sample_data,vu->vu_levels,contest);
+            currentViz->updateVariables(visTimer.getSeconds(),sample_data,vu->vu_levels,contest);
+            currentViz->display();
+            
             glfwSwapBuffers(window);
             frameSlice = 0.0f;
         }

@@ -1,3 +1,5 @@
+#version 150
+out vec4 outputF;
 //
 // Thematica : Tunnel dans un tore
 // Credit: http://glsl.heroku.com/e#8774.0 

@@ -1,14 +1,18 @@
-#ifdef GL_ES
-precision mediump float;
-#endif
+#version 150
+out vec4 outputF;
 
 uniform float time;
 uniform vec2 mouse;
 uniform vec2 resolution;
 //tigrou 2013.02.28 (for gamedevdtack exchange)
 
+uniform float vuData[128];
+uniform vec3 randColor;
+uniform float timerKick;
+
 float get2DTexture(float x, float y)
 {
+	
    return sin(x)+sin(y);
 }
 
@@ -45,13 +49,14 @@ void main( void ) {
      sy = r.y;
    
      //move	
-     sx += time / 1.0 * sign(pz);
+     sx += (time) / 1.0 * sign(pz);
 	
-     float color = get2DTexture(sx * scaling, sy * scaling);  
+	 int idx = int(mod(sx,1.0)*8.0)+int(mod(sy,1.0)*8.0)*8;
+     float color = vuData[abs(idx-64)%64]/6.0; //get2DTexture(sx * scaling, sy * scaling);  
 
      //shading
-     color *= pow(pz,1.5)*10.0;	
+     color *= pow(pz,1.5)*280.0;	
 	
-     gl_FragColor = vec4( -color,color,color,  1.0);
+     outputF = vec4( randColor*color,  1.0);
 
 }

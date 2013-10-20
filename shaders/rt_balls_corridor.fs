@@ -1,6 +1,5 @@
-#ifdef GL_ES
-precision highp float;
-#endif
+#version 150
+out vec4 outputF;
 
 uniform float time;
 uniform vec2 mouse;
