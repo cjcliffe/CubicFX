@@ -65,7 +65,7 @@ void main( void ) {
 	wallColor *= abs(sin(angle*PI*100.0 + time*5.0))/2.2;
 	
 	int vuxPos = int(abs(gl_FragCoord.x/resolution.x)*128.0);	
-	if ((gl_FragCoord.y/resolution.y)<=vuData[vuxPos]) {
+	if ((gl_FragCoord.y/resolution.y)<=vuData[vuxPos]/2.0) {
 		wallColor += 0.25*vuData[vuxPos];
 	}
 	

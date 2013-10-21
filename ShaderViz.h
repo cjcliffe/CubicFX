@@ -48,7 +48,7 @@ namespace CubicVR {
         shaderUniformInt u_beatCounterQuarter;
         
         shaderUniformFloat u_timerKick;
-        
+        shaderUniformFloat u_sampleRange;
         
         vec3 randColor, randColor2;
         int lastBeat;
@@ -61,6 +61,7 @@ namespace CubicVR {
         ShaderViz(string vsFn, string fsFn);
         
         float floatArrayAverage(float *data, int start, int end);
+        float floatArrayAbsAverage(float *data, int start, int end);
         
         void updateVariables(float time_value, vector<float> &sample_data, vector<float> &vu_data, BeatDetektorContest *contest);
         

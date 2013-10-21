@@ -187,6 +187,8 @@ int main(int argc, char * argv[])
     ShaderViz rbCrawl("shaders/vertex_common.vs", "shaders/red_blue_crawl_pattern.fs");
     ShaderViz rmTunnel("shaders/vertex_common.vs", "shaders/raymarch_tunnel.fs");
     ShaderViz discoFloor("shaders/vertex_common.vs", "shaders/discofloor_ceiling.fs");
+    ShaderViz sparklingSine("shaders/vertex_common.vs", "shaders/sparkling_sine_wave.fs");
+    ShaderViz flareTunnel("shaders/vertex_common.vs", "shaders/flare_tunnel.fs");
     
 //    ShaderViz torusSwirl("shaders/vertex_common.vs", "shaders/torus_tunnel_swirl.fs");
 //    ShaderViz rmBoxFloor("shaders/vertex_common.vs", "shaders/rm_box_floor.fs");
@@ -202,13 +204,15 @@ int main(int argc, char * argv[])
     visualizers.push_back(&rbCrawl);
     visualizers.push_back(&rmTunnel);
     visualizers.push_back(&discoFloor);
+    visualizers.push_back(&sparklingSine);
+    visualizers.push_back(&flareTunnel);
 
 //    visualizers.push_back(&torusSwirl);
 //    visualizers.push_back(&rmCorridorBalls);
 //    visualizers.push_back(&cubeMatrix);
 //    visualizers.push_back(&rmBoxFloor);
     
-    ShaderViz *currentViz = &discoFloor;
+    ShaderViz *currentViz = &sparklingSine;
     
     float frameSlice = 0.0f;
     

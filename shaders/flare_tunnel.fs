@@ -1,12 +1,11 @@
-#ifdef GL_ES
-precision mediump float;
-#endif
+#version 150
+out vec4 outputF;
 
 #define FlareScale 5.0
 #define FlareMix 1.0
 #define TimeScale 2.0
-#define TunnelSegments 192.0
-#define TunnelDist 192
+#define TunnelSegments 128.0
+#define TunnelDist 128
 #define TunnelSpeed 5.0
 #define CosmosMix 1.0
 #define CosmosRot 0.0
@@ -19,8 +18,11 @@ precision mediump float;
  */
 
 uniform float time;
+uniform float timerKick;
 uniform vec2 resolution;
-uniform vec2 mouse;
+uniform float vuHigh;
+uniform float vuLow;
+uniform vec3 randColor;
 
 vec4 colour(float c, float d)
 {
@@ -63,7 +65,7 @@ float distfunc(vec3 pos, float t)
 	return min(max(max(
 		periodic(r,3.0,0.2),
 		periodic(pos.z,1.0,0.7+0.3*cos(t/3.0))),
-		periodic(a*r,3.141592*2.0/6.0*r,0.7+0.3*cos(t/3.0))),0.25);
+		periodic(a*r,3.141592*2.0/6.0*r,0.7+0.3*(cos(t/3.0)-0.2))),0.25);
 }
 
 vec4 cosmos(float t) 
@@ -120,15 +122,16 @@ vec4 flareColor(float e)
 {
 	vec2 position = ( gl_FragCoord.xy / resolution.xy * 2.0 ) - 1.0;
 	position.x *= resolution.x / resolution.y;
-	vec3 color = flare(position, vec2(0.0) , vec3(0.5, 0.8, 1.5), e);
+	vec3 color = flare(position, vec2(0.0) , randColor, e);
 	return vec4( color * (0.95 + noise(position*0.001 + 0.00001) * 0.05), 1.0 );
 }
+
 
 void main()
 {
 	float t = time * TimeScale;
 	
-	float d = (sin((t - 5.0) / 3.0)*0.5+0.5);
+	float d = 0.2+vuLow; //(sin((t - 5.0) / 3.0)*0.5+0.5);
 	float mx = 0.5;
 	float my = 0.5;
 	
@@ -138,16 +141,18 @@ void main()
 	float i = TunnelSegments;
 	for(int j=0;j<TunnelDist;j++)
 	{
-		float dist=distfunc(ray_pos,t);
+		float dist=distfunc(ray_pos,(timerKick*5.0));
 		ray_pos+=dist*ray_dir;
 
 		if(abs(dist)<0.001) { i=float(j); break; }
 	}
 
 	float c = i / TunnelSegments;
-	gl_FragColor = colour(c, d) * 1.0;
-	gl_FragColor += flareColor(d) * d * FlareMix;
-	gl_FragColor += cosmos(t) * d * d * CosmosMix;
-	gl_FragColor *= d;
-	gl_FragColor *= mod(gl_FragCoord.y, 2.0);
+	vec3 distc = (colour(c, d) * 1.0).rgb;
+	
+	outputF = vec4(randColor*(distc.r+distc.g+distc.b),1.0);
+	outputF += flareColor(d) * d * FlareMix;
+//	outputF += cosmos(t) * d * d * CosmosMix;
+	outputF *= d;
+	outputF *= mod(gl_FragCoord.y, 2.0);
 }

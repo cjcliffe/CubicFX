@@ -24,6 +24,16 @@ float ShaderViz::floatArrayAverage(float *data, int start, int end) {
     return accum;
 }
 
+float ShaderViz::floatArrayAbsAverage(float *data, int start, int end) {
+    float accum = 0;
+    for (int i = start; i < end; i++) {
+        accum += fabs(data[i]);
+    }
+    accum /= (float)end-start;
+    
+    return accum;
+}
+
 void ShaderViz::updateVariables(float time_value, vector<float> &sample_data, vector<float> &vu_data, BeatDetektorContest *contest) {
     
     a_vertexPosition.set(fsQuadMesh.getVBO()->gl_points);
@@ -59,6 +69,11 @@ void ShaderViz::updateVariables(float time_value, vector<float> &sample_data, ve
     if (u_sampleData.size) {
         u_sampleData.set(&sample_data[0]);
         u_sampleData.update();
+    }
+    
+    if (u_sampleRange.size) {
+        u_sampleRange.set(floatArrayAbsAverage(&sample_data[0], 0, sample_data.size()));
+        u_sampleRange.update();
     }
     
     if (u_vuData.size) {
@@ -185,6 +200,7 @@ void ShaderViz::init(string vsFn, string fsFn) {
     u_beatCounterQuarter = shaderVars.getUniform("beatCounterQuarter");
     
     u_timerKick = shaderVars.getUniform("timerKick");
+    u_sampleRange = shaderVars.getUniform("sampleRange");
     
     fsQuadMesh.addPoint(vec3(-1.0f, -1.0f, -1.0f));
     fsQuadMesh.addPoint(vec3(1.0f, -1.0f, -1.0f));
