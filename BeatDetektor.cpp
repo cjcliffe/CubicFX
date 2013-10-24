@@ -494,7 +494,7 @@ void BeatDetektorVU::process(BeatDetektor *detector, float last_update, float cu
 		}
 		else 
 		{
-			if (current_bpm) vu_levels[i] -= (last_update/current_bpm)*2.0;
+			if (current_bpm) vu_levels[i] -= (last_update/current_bpm)*4.0;
 		}
 		
 		if (vu_levels[i] < 0 || vu_levels[i] != vu_levels[i]) vu_levels[i] = 0;

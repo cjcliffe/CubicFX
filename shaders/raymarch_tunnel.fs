@@ -41,7 +41,7 @@ vec4 hash(vec4 n) { return fract(sin(n)*43758.5453123); }
 }
 */
 void main( void ) {
-	vec3 pos    = vec3(0, 0, (time+(timerKick*4.0)) * 5.0);
+	vec3 pos    = vec3(0, 0, (time+(timerKick*2.0)) * 5.0);
 	vec3 dir    = normalize(vec3( (-1.0 + 2.0 * ( gl_FragCoord.xy / resolution.xy )) * vec2(resolution.x / resolution.y, 1.0), 1.0));
 	float t     = 0.0;
 	dir.xy = rot(dir.xy, mouse.x * 6.0);

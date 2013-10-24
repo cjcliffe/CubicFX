@@ -24,13 +24,13 @@ void main( void ) {
 	float scaline = mix(abs(sin(gl_FragCoord.y/2.0+time/6.0)), abs(sin(gl_FragCoord.x/2.0+time/6.0)), 0.5);
 	
 	vec3 color = (intensity/2.0)*randColor;
-	
-	int vuxPos = int(abs(gl_FragCoord.x/resolution.x)*128.0);	
-	float vuxData = vuData[vuxPos]/2.0;
+
+	int vuxPos = int(floor((gl_FragCoord.y/resolution.y)*8.0)*8.0+floor((gl_FragCoord.x/resolution.x)*8.0));	
+	float vuxData = vuData[abs(32-vuxPos)];
 	float posY = (gl_FragCoord.y/resolution.y);
 	//if (posY<=vuxData || (1.0-posY)<=vuxData) {
-		color += randColor*0.5*vuData[vuxPos];
-		//}
+		color += randColor*vuData[vuxPos];
+	//}
 		
 	color /= (scaline);
 	

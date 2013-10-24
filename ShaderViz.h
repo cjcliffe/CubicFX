@@ -48,13 +48,15 @@ namespace CubicVR {
         shaderUniformInt u_beatCounterQuarter;
         
         shaderUniformFloat u_timerKick;
+        shaderUniformFloat u_timerMid;
+        shaderUniformFloat u_timerHigh;
         shaderUniformFloat u_sampleRange;
         
         vec3 randColor, randColor2;
         int lastBeat;
         float lastTime;
         
-        float timerKick;
+        float timerKick, timerMid, timerHigh;
         
         Mesh fsQuadMesh;
         

@@ -140,7 +140,18 @@ void ShaderViz::updateVariables(float time_value, vector<float> &sample_data, ve
         u_timerKick.update();
     }
     
-    
+    if (u_timerMid.size) {
+        timerMid += floatArrayAverage(&vu_data[0], 50, 60)*last_update*5.0;
+        u_timerMid.set(timerMid);
+        u_timerMid.update();
+    }
+
+    if (u_timerHigh.size) {
+        timerHigh += floatArrayAverage(&vu_data[0], 100, 128)*last_update*5.0;
+        u_timerHigh.set(timerHigh);
+        u_timerHigh.update();
+    }
+
 }
 
 
@@ -200,6 +211,8 @@ void ShaderViz::init(string vsFn, string fsFn) {
     u_beatCounterQuarter = shaderVars.getUniform("beatCounterQuarter");
     
     u_timerKick = shaderVars.getUniform("timerKick");
+    u_timerMid = shaderVars.getUniform("timerMid");
+    u_timerHigh = shaderVars.getUniform("timerHigh");
     u_sampleRange = shaderVars.getUniform("sampleRange");
     
     fsQuadMesh.addPoint(vec3(-1.0f, -1.0f, -1.0f));

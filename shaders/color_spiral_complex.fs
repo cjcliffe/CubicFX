@@ -1,10 +1,15 @@
-#ifdef GL_ES
-precision highp float;
-#endif
+#version 150
+out vec4 outputF;
+
+
 uniform float time;
-uniform vec2 mouse;
+
 uniform vec2 resolution;
-uniform sampler2D backbuffer;
+uniform float timerKick;
+uniform float timerMid;
+uniform float timerHigh;
+uniform float vuLow;
+
 #define pi 3.141592653589793238462643383279
 #define pi_inv 0.318309886183790671537767526745
 #define pi2_inv 0.159154943091895335768883763372
@@ -66,15 +71,20 @@ float fScale = 2.0;
 
 void main(void)
 {
-		// domain map
+	// domain map
 	vec2 uv = gl_FragCoord.xy / resolution.xy;
+	
+	vec2 mouse;
+	
+	mouse.x = 10.0*sin((time+timerHigh*6.0)/100.0);
+	mouse.y = 10.0*cos((time+timerKick*8.0)/100.0);
 	
 	// aspect-ratio correction
 	vec2 aspect = vec2(1.,resolution.y/resolution.x);
 	vec2 uv_correct = 0.5 + (uv -0.5)/ aspect.yx;
 	vec2 mouse_correct = 0.5 + ( mouse.xy / resolution.xy - 0.5) / aspect.yx;
 		
-	float phase = time*0. + pi*1.;
+	float phase = (time+timerKick)*0. + pi*1.;
 	float dist = 1.;
 	vec2 uv_bipolar = mobius(uv_correct, vec2(0.5 - dist*0.5, 0.5), vec2(0.5 + dist*0.5, 0.5));
 	uv_bipolar = spiralzoom(uv_bipolar, vec2(0.), 8., 0., 0.9, mouse.yx*vec2(-1.,2.)*4. );
@@ -88,7 +98,7 @@ void main(void)
 
 	for(float i=0.0; i < 16.0; i += 2.0)
 	{
-		nd =cos(3.14159 * i * pos.x + (i * 2.75 + cos(time) * 0.25) + time) * (pos.x - 0.5) + 0.5;
+		nd =cos(3.14159 * i * pos.x + (i * 2.75 + cos((time+timerMid*5.0)) * 0.25) + (time+timerMid*5.0)) * (pos.x - 0.5) + 0.5;
 		amnt = 1.0 / abs(nd - pos.y) * 0.005; 
 		
 		cbuff += vec4(amnt, amnt * 0.2 , amnt * pos.y, 2.0)*4.;
@@ -96,11 +106,11 @@ void main(void)
 	
 	for(float i=0.0; i < 16.0; i += 2.0)
 	{
-		nd =cos(3.14159 * i * pos.y + (i * 2.75 + cos(time) * 0.25) + time) * (pos.y - 0.5) + 0.5;
+		nd =cos(3.14159 * i * pos.y + (i * 2.75 + cos((time+timerMid*5.0)) * 0.25) + (time+timerMid*5.0)) * (pos.y - 0.5) + 0.5;
 		amnt = 1.0 / abs(nd - pos.x) * 0.005; 
 		
 		cbuff += vec4(amnt * pos.x, amnt * pos.y , amnt * 0.9, 1.0) *2.0;
 	}
 	
-	gl_FragColor=vec4(cbuff.rgb, 1.0);
+	outputF=vec4(cbuff.rgb, 1.0);
 }

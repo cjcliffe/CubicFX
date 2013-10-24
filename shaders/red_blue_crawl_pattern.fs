@@ -19,7 +19,7 @@ void main(void)
 {
 	float timer = (time+timerKick)*4.0;
 
-	float N = 6.0 + float(int(floor(beatCounter/8)) % 8);
+	float N = 6.0 + float(int(floor(beatCounter/32)) % 8);
 	
 	vec2 center = (gl_FragCoord.xy);
 	center.x=-200.2*sin(time/100.0);

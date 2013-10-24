@@ -149,6 +149,56 @@ void processBD() {
 }
 
 Timer fpsTimer;
+ShaderViz *currentViz;
+vector<ShaderViz *> visualizers;
+
+static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+        glfwSetWindowShouldClose(window, GL_TRUE);
+        return;
+    }
+    
+    
+    
+    if (action == GLFW_PRESS) {
+        
+        switch (key) {
+            case GLFW_KEY_1:
+                currentViz = visualizers[0];
+            break;
+            case GLFW_KEY_2:
+                currentViz = visualizers[1];
+                break;
+            case GLFW_KEY_3:
+                currentViz = visualizers[2];
+                break;
+            case GLFW_KEY_4:
+                currentViz = visualizers[3];
+                break;
+            case GLFW_KEY_5:
+                currentViz = visualizers[4];
+                break;
+            case GLFW_KEY_6:
+                currentViz = visualizers[5];
+            break;
+            case GLFW_KEY_7:
+                currentViz = visualizers[6];
+                break;
+            case GLFW_KEY_8:
+                currentViz = visualizers[7];
+            break;
+            case GLFW_KEY_9:
+                currentViz = visualizers[8];
+                break;
+            case GLFW_KEY_0:
+                currentViz = visualizers[9];
+            break;
+        }
+    }
+
+}
+
 
 int main(int argc, char * argv[])
 {
@@ -176,12 +226,14 @@ int main(int argc, char * argv[])
     
     glfwMakeContextCurrent(window);
     
+    glfwSetKeyCallback(window, key_callback);
+    
     initBD();
     
     visTimer.start();
     fpsTimer.start();
     
-    vector<ShaderViz *> visualizers;
+
     
     ShaderViz vizRgbFlares("shaders/vertex_common.vs", "shaders/rgb_flares_in_tunnel.fs");
     ShaderViz rbCrawl("shaders/vertex_common.vs", "shaders/red_blue_crawl_pattern.fs");
@@ -189,6 +241,10 @@ int main(int argc, char * argv[])
     ShaderViz discoFloor("shaders/vertex_common.vs", "shaders/discofloor_ceiling.fs");
     ShaderViz sparklingSine("shaders/vertex_common.vs", "shaders/sparkling_sine_wave.fs");
     ShaderViz flareTunnel("shaders/vertex_common.vs", "shaders/flare_tunnel.fs");
+    ShaderViz colorSpiral("shaders/vertex_common.vs","shaders/color_spiral_complex.fs");
+    ShaderViz sparklingBlocks("shaders/vertex_common.vs","shaders/sparkling_blocks.fs");
+    ShaderViz mandelBlob("shaders/vertex_common.vs","shaders/raymarch_fractal3d.fs");
+    ShaderViz lineZoom("shaders/vertex_common.vs","shaders/raymarch_lines_zoom.fs");
     
 //    ShaderViz torusSwirl("shaders/vertex_common.vs", "shaders/torus_tunnel_swirl.fs");
 //    ShaderViz rmBoxFloor("shaders/vertex_common.vs", "shaders/rm_box_floor.fs");
@@ -206,13 +262,17 @@ int main(int argc, char * argv[])
     visualizers.push_back(&discoFloor);
     visualizers.push_back(&sparklingSine);
     visualizers.push_back(&flareTunnel);
+    visualizers.push_back(&colorSpiral);
+    visualizers.push_back(&sparklingBlocks);
+    visualizers.push_back(&mandelBlob);
+    visualizers.push_back(&lineZoom);
 
 //    visualizers.push_back(&torusSwirl);
 //    visualizers.push_back(&rmCorridorBalls);
 //    visualizers.push_back(&cubeMatrix);
 //    visualizers.push_back(&rmBoxFloor);
     
-    ShaderViz *currentViz = &sparklingSine;
+    currentViz = &colorSpiral;
     
     float frameSlice = 0.0f;
     
