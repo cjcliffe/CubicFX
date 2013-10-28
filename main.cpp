@@ -9,10 +9,21 @@
 #include <iostream>
 
 #include "ShaderViz.h"
-#define GLFW_INCLUDE_GLCOREARB
+#ifdef _WIN32
+	#define GLFW_INCLUDE_NONE
+#else
+	#define GLFW_INCLUDE_GLCOREARB
+#endif
 #include <GLFW/glfw3.h>
+
+#ifdef WIN32
+#include <AL/al.h>
+#include <AL/alc.h>
+#else
 #include <OpenAL/al.h>
 #include <OpenAL/alc.h>
+#endif
+
 #include <cubicvr2/core/Timer.h>
 
 #include "FFT.h"
@@ -216,7 +227,7 @@ int main(int argc, char * argv[])
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     
-    GLFWwindow *window = glfwCreateWindow(1280, 720, "CubicVR-2 Test", NULL, NULL);
+    GLFWwindow *window = glfwCreateWindow(1280, 720, "BeatDetektor ShaderFX", NULL, NULL);
     
     if (!window)
     {
@@ -226,6 +237,17 @@ int main(int argc, char * argv[])
     
     glfwMakeContextCurrent(window);
     
+#ifdef _WIN32
+	glewExperimental = true;
+	GLenum err = glewInit();
+	if (GLEW_OK != err)
+	{
+		fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
+		return -1;
+	}
+#endif
+
+
     glfwSetKeyCallback(window, key_callback);
     
     initBD();
@@ -272,7 +294,7 @@ int main(int argc, char * argv[])
 //    visualizers.push_back(&cubeMatrix);
 //    visualizers.push_back(&rmBoxFloor);
     
-    currentViz = &colorSpiral;
+	currentViz = &flareTunnel;
     
     float frameSlice = 0.0f;
     

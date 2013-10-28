@@ -39,7 +39,7 @@ float map(vec3 p)
 void main( void )
 {
     vec2 pos = (gl_FragCoord.xy*2.1 - resolution.xy) / resolution.y;
-    vec3 camPos = vec3(1.5*cos((time+timerKick)*0.45), 1.5*sin((time+timerKick)*0.34), -1.5*sin((time)*0.23));
+    vec3 camPos = vec3(2.0*cos((time+timerKick)*0.45), 2.0*sin((time+timerKick)*0.34), -2.0*sin((time)*0.23));
     vec3 camTarget = vec3(0.0, 0.0, 0.0);
 
     vec3 camDir = normalize(camTarget-camPos);

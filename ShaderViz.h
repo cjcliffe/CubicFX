@@ -12,8 +12,7 @@
 #include "cubicvr2/opengl/Material.h"
 #include "cubicvr2/core/Mesh.h"
 #include "cubicvr2/core/Camera.h"
-#define GLFW_INCLUDE_GLCOREARB
-#include <GLFW/glfw3.h>
+
 #include <math.h>
 #include "BeatDetektor.h"
 

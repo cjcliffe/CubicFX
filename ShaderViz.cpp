@@ -11,6 +11,8 @@ using namespace CubicVR;
 ShaderViz::ShaderViz(string vsFn, string fsFn) {
     init(vsFn,fsFn);
     timerKick = 0.0f;
+	timerMid = 0.0f;
+	timerHigh = 0.0f;
     lastTime = 0.0f;
 }
 

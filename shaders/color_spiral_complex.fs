@@ -74,20 +74,18 @@ void main(void)
 	// domain map
 	vec2 uv = gl_FragCoord.xy / resolution.xy;
 	
-	vec2 mouse;
-	
-	mouse.x = 10.0*sin((time+timerHigh*6.0)/100.0);
-	mouse.y = 10.0*cos((time+timerKick*8.0)/100.0);
+	float mouse_x = 10.0*sin((time+timerHigh*6.0)/100.0);
+	float mouse_y = 10.0*cos((time+timerKick*8.0)/100.0);
 	
 	// aspect-ratio correction
 	vec2 aspect = vec2(1.,resolution.y/resolution.x);
 	vec2 uv_correct = 0.5 + (uv -0.5)/ aspect.yx;
-	vec2 mouse_correct = 0.5 + ( mouse.xy / resolution.xy - 0.5) / aspect.yx;
+	vec2 mouse_correct = 0.5 + ( vec2(mouse_x,mouse_y) / resolution.xy - 0.5) / aspect.yx;
 		
 	float phase = (time+timerKick)*0. + pi*1.;
 	float dist = 1.;
 	vec2 uv_bipolar = mobius(uv_correct, vec2(0.5 - dist*0.5, 0.5), vec2(0.5 + dist*0.5, 0.5));
-	uv_bipolar = spiralzoom(uv_bipolar, vec2(0.), 8., 0., 0.9, mouse.yx*vec2(-1.,2.)*4. );
+	uv_bipolar = spiralzoom(uv_bipolar, vec2(0.0), 8.0, 0., 0.9, vec2(mouse_y,mouse_x)*vec2(-1.0,2.0)*4. );
 	uv_bipolar = vec2(-uv_bipolar.y,uv_bipolar.x); // 90° rotation 
 	
 	

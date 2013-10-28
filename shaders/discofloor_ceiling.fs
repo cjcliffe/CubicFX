@@ -55,7 +55,7 @@ void main( void ) {
      float color = vuData[abs(idx-64)%64]/6.0; //get2DTexture(sx * scaling, sy * scaling);  
 
      //shading
-     color *= pow(pz,1.5)*280.0;	
+    color *= pow(abs(pz),1.5)*280.0;	
 	
      outputF = vec4( randColor*color,  1.0);
 

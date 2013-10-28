@@ -44,10 +44,17 @@ SET( CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${PROJECT_BINARY_DIR})
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/glfw-3.0.3 ${PROJECT_BINARY_DIR}/glfw/)
 include_directories(${PROJECT_SOURCE_DIR}/glfw-3.0.3/include)
-include_directories ( "${PROJECT_SOURCE_DIR}/../CubicVR-2/build/include" )
-link_directories ( "${PROJECT_SOURCE_DIR}/../CubicVR-2/build/lib" )
+include_directories ( ${PROJECT_SOURCE_DIR}/../CubicVR-2/build/include )
+link_directories ( ${PROJECT_SOURCE_DIR}/../CubicVR-2/build/lib )
 
-find_package (OpenAL)
+
+IF (DEFINED WIN32)
+	include_directories ( ${PROJECT_SOURCE_DIR}/openal-soft-1.15.1/include )
+	link_directories ( ${PROJECT_SOURCE_DIR}/openal-soft-1.15.1/lib/Win64 )
+	SET (OPENAL_LIBRARY libOpenAL32.dll winmm)
+ELSE (DEFINED WIN32)
+	find_package (OpenAL)
+ENDIF (DEFINED WIN32)
 
 SET (shaderfx_sources
     main.cpp
@@ -60,8 +67,6 @@ SET (shaderfx_headers
 	FFT.h
 	BeatDetektor.h
 )
-
-
 
 configure_files(${PROJECT_SOURCE_DIR}/shaders ${PROJECT_BINARY_DIR}/shaders COPYONLY)
 configure_files(${PROJECT_SOURCE_DIR}/shaders ${PROJECT_BINARY_DIR}/shaders COPYONLY)
