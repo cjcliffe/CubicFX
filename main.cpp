@@ -30,7 +30,7 @@
 #include "BeatDetektor.h"
 
 #define SRATE 44100
-#define BUF 1024
+#define BUF 2048
 
 using namespace std;
 
@@ -82,6 +82,7 @@ static void captureAudio(void) {
     
 	alcGetIntegerv(audio_device, ALC_CAPTURE_SAMPLES, (ALCsizei)sizeof(ALint), &samples);
 	alcCaptureSamples(audio_device, (ALCvoid *)audio_buffer, samples);
+	
 	
 	for (x=0; x<BUF; x++)
 	{
@@ -205,7 +206,13 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
             case GLFW_KEY_0:
                 currentViz = visualizers[9];
             break;
-        }
+			case GLFW_KEY_Q:
+				currentViz = visualizers[10];
+			break;
+			case GLFW_KEY_W:
+				currentViz = visualizers[11];
+			break;
+		}
     }
 
 }
@@ -228,6 +235,7 @@ int main(int argc, char * argv[])
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     
     GLFWwindow *window = glfwCreateWindow(1280, 720, "BeatDetektor ShaderFX", NULL, NULL);
+//    GLFWwindow *window = glfwCreateWindow(1280, 720, "BeatDetektor ShaderFX", glfwGetPrimaryMonitor(), NULL);
     
     if (!window)
     {
@@ -267,7 +275,9 @@ int main(int argc, char * argv[])
     ShaderViz sparklingBlocks("shaders/vertex_common.vs","shaders/sparkling_blocks.fs");
     ShaderViz mandelBlob("shaders/vertex_common.vs","shaders/raymarch_fractal3d.fs");
     ShaderViz lineZoom("shaders/vertex_common.vs","shaders/raymarch_lines_zoom.fs");
-    
+	ShaderViz flareWave("shaders/vertex_common.vs", "shaders/flare_wave.fs");
+	ShaderViz renderObjs("shaders/vertex_common.vs", "shaders/render_objects.fs");
+
 //    ShaderViz torusSwirl("shaders/vertex_common.vs", "shaders/torus_tunnel_swirl.fs");
 //    ShaderViz rmBoxFloor("shaders/vertex_common.vs", "shaders/rm_box_floor.fs");
 //    ShaderViz cubeMatrix("shaders/vertex_common.vs", "shaders/rm_cube_matrix.fs");
@@ -288,13 +298,15 @@ int main(int argc, char * argv[])
     visualizers.push_back(&sparklingBlocks);
     visualizers.push_back(&mandelBlob);
     visualizers.push_back(&lineZoom);
+	visualizers.push_back(&flareWave);
+	visualizers.push_back(&renderObjs);
 
 //    visualizers.push_back(&torusSwirl);
 //    visualizers.push_back(&rmCorridorBalls);
 //    visualizers.push_back(&cubeMatrix);
 //    visualizers.push_back(&rmBoxFloor);
     
-	currentViz = &flareTunnel;
+	currentViz = &renderObjs;
     
     float frameSlice = 0.0f;
     
