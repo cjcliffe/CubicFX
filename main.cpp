@@ -30,7 +30,7 @@
 #include "BeatDetektor.h"
 
 #define SRATE 44100
-#define BUF 2048
+#define BUF 1024
 
 using namespace std;
 
@@ -52,7 +52,7 @@ BeatDetektorVU *vu;
 BeatDetektorContest *contest;
 
 int initAudio() {
- 	alGetError();
+	ALenum err = alGetError();
 	const ALchar *pDeviceList = alcGetString(NULL, ALC_CAPTURE_DEVICE_SPECIFIER);
 	if (pDeviceList) {
 		printf("Available Capture Devices are:\n");
@@ -61,10 +61,21 @@ int initAudio() {
 			pDeviceList += strlen(pDeviceList) + 1;
 		}
 	}
-	
+
 	audio_device = alcCaptureOpenDevice(NULL, SRATE*2, AL_FORMAT_STEREO16, BUF);
-	if (alGetError() != AL_NO_ERROR) {
-		return 0;
+	err = alGetError();
+	if (err != AL_NO_ERROR) {
+		switch (err) {
+		case AL_INVALID_OPERATION:
+			printf("alcCaptureOpenDevice reports Invalid Operation?\n");
+			break;
+		case AL_INVALID_VALUE:
+			printf("alcCaptureOpenDevice reports Invalid Value\n");
+			return 0;
+		case ALC_OUT_OF_MEMORY:
+			printf("alcCaptureOpenDevice reports Out Of Memory\n");
+			return 0;
+		}
 	}
 	alcCaptureStart(audio_device);
 
@@ -206,12 +217,31 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
             case GLFW_KEY_0:
                 currentViz = visualizers[9];
             break;
+
 			case GLFW_KEY_Q:
 				currentViz = visualizers[10];
 			break;
 			case GLFW_KEY_W:
 				currentViz = visualizers[11];
 			break;
+			case GLFW_KEY_E:
+				currentViz = visualizers[12];
+				break;
+			case GLFW_KEY_R:
+				currentViz = visualizers[13];
+				break;
+			case GLFW_KEY_T:
+				currentViz = visualizers[14];
+				break;
+			case GLFW_KEY_Y:
+				currentViz = visualizers[15];
+				break;
+			case GLFW_KEY_U:
+				currentViz = visualizers[16];
+				break;
+			case GLFW_KEY_I:
+				currentViz = visualizers[17];
+				break;
 		}
     }
 
@@ -221,10 +251,6 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 int main(int argc, char * argv[])
 {
 
-    if (!initAudio()) {
-        return -1;
-    }
-    
     if (!glfwInit()) {
         return -1;
     }
@@ -242,7 +268,11 @@ int main(int argc, char * argv[])
         glfwTerminate();
         return -1;
     }
-    
+
+	if (!initAudio()) {
+		return -1;
+	}
+
     glfwMakeContextCurrent(window);
     
 #ifdef _WIN32
@@ -277,6 +307,14 @@ int main(int argc, char * argv[])
     ShaderViz lineZoom("shaders/vertex_common.vs","shaders/raymarch_lines_zoom.fs");
 	ShaderViz flareWave("shaders/vertex_common.vs", "shaders/flare_wave.fs");
 	ShaderViz renderObjs("shaders/vertex_common.vs", "shaders/render_objects.fs");
+	ShaderViz hexField("shaders/vertex_common.vs", "shaders/hex_twist_field.fs");
+	ShaderViz discoBall("shaders/vertex_common.vs", "shaders/discoball.fs");
+	ShaderViz cubeArray("shaders/vertex_common.vs", "shaders/cube_array.fs");
+	ShaderViz planeDeformFly("shaders/vertex_common.vs", "shaders/planed_fly.fs");
+	ShaderViz planeDeformReliefTunnel("shaders/vertex_common.vs", "shaders/planed_relief_tun.fs");
+	ShaderViz planeDeformSquareTunnel("shaders/vertex_common.vs", "shaders/planed_square_tun.fs");
+
+//	ShaderViz roadToHell("shaders/vertex_common.vs", "shaders/road_to_hell.fs");
 
 //    ShaderViz torusSwirl("shaders/vertex_common.vs", "shaders/torus_tunnel_swirl.fs");
 //    ShaderViz rmBoxFloor("shaders/vertex_common.vs", "shaders/rm_box_floor.fs");
@@ -300,13 +338,20 @@ int main(int argc, char * argv[])
     visualizers.push_back(&lineZoom);
 	visualizers.push_back(&flareWave);
 	visualizers.push_back(&renderObjs);
+	visualizers.push_back(&hexField);
+	visualizers.push_back(&discoBall);
+	visualizers.push_back(&cubeArray);
+	visualizers.push_back(&planeDeformFly);
+	visualizers.push_back(&planeDeformReliefTunnel);
+	visualizers.push_back(&planeDeformSquareTunnel);
+
 
 //    visualizers.push_back(&torusSwirl);
 //    visualizers.push_back(&rmCorridorBalls);
 //    visualizers.push_back(&cubeMatrix);
 //    visualizers.push_back(&rmBoxFloor);
     
-	currentViz = &renderObjs;
+	currentViz = &planeDeformSquareTunnel;
     
     float frameSlice = 0.0f;
     
@@ -319,10 +364,12 @@ int main(int argc, char * argv[])
         if (frameSlice > 0.5f) {
             frameSlice = 0.0;
         }
-        
+
+		captureAudio();
+
         if (frameSlice >= 1.0f/60.0f) {
             visTimer.update();
-            captureAudio();
+
             processBD();
             
             currentViz->updateVariables(visTimer.getSeconds(),sample_data,vu->vu_levels,contest);

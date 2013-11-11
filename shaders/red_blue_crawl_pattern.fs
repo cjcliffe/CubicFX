@@ -17,7 +17,7 @@ uniform vec3 randColor2;
 
 void main(void) 
 {
-	float timer = (time+timerKick)*4.0;
+	float timer = (time+timerKick)*2.0;
 
 	float N = 6.0 + float(int(floor(beatCounter/32)) % 8);
 	

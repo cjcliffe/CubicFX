@@ -149,8 +149,8 @@ vec2 map( in vec3 pos )
 	
 	for (float i = -sz; i < sz; i+=1.0) {
 		for (float j = -sz; j < sz; j+=1.0) {
-			int vuIdx = ((int(i+sz))*5+(int(j+sz)))*2;
-			float vuVal = vuData[vuIdx]*2.0;
+			int vuIdx = ((int(i+sz))*5+(int(j+sz)))*3;
+			float vuVal = clamp(vuData[vuIdx]*5.0,0.0,6.0);
 		 	res = opU( res, vec2( udRoundBox(  pos-vec3( 1.5*i,vuVal+0.15, 1.5*j), vec3(0.5,vuVal+0.25,0.5) , 0.1), 1.0 )); 
 		}
 	}
@@ -311,7 +311,7 @@ void main( void )
 	//float time = 15.0 + iGlobalTime;
 
 	// camera	
-	vec3 ro = 3.0*vec3( -3.2*cos(0.25*(timerKick) + 0.2*time + 6.0), 2.0, 3.2*sin(0.4*(timerKick)  + 0.25*time+ 6.0) );
+	vec3 ro = 3.0*vec3( -3.2*cos(0.25 + 0.2*time + 6.0), 2.0, 3.2*sin(0.4  + 0.25*time+ 6.0) );
 	vec3 ta = vec3( 0.0, 1.5, 0.0 );
 	
 	// camera tx
