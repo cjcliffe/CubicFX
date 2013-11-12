@@ -8,8 +8,14 @@ uniform float vuData[128];
 uniform vec3 randColor;
 
 vec3 planeVUMatrix(vec2 uv) {
-	int idx = int(mod(uv.x,1.0)*8.0)+int(mod(uv.y,1.0)*8.0)*8;
-    float color = vuData[abs(idx-64)%64]*2.0;
+	float upos = mod(uv.x,1.0)*8.0;
+	float vpos = mod(uv.y,1.0)*8.0;
+	int idx = int(upos)+int(vpos)*8;
+    
+	float color = vuData[abs(idx-64)%64]*2.0;
+	
+	color *= sin(3.14159*(upos-floor(upos)));
+	color *= sin(3.14159*(vpos-floor(vpos)));
 	
 	return randColor*color;
 }

@@ -25,12 +25,15 @@ void main( void ) {
 	
 	vec3 color = (intensity/2.0)*randColor;
 
-	int vuxPos = int(floor((gl_FragCoord.y/resolution.y)*8.0)*8.0+floor((gl_FragCoord.x/resolution.x)*8.0));	
+	
+	float upos = (gl_FragCoord.y/resolution.y)*8.0;
+	float vpos = (gl_FragCoord.x/resolution.x)*8.0;
+	int vuxPos = int(floor(upos)*8.0+floor(vpos));	
+	
 	float vuxData = vuData[abs(32-vuxPos)];
 	float posY = (gl_FragCoord.y/resolution.y);
-	//if (posY<=vuxData || (1.0-posY)<=vuxData) {
-		color += randColor*vuData[vuxPos];
-	//}
+
+	color += randColor*vuData[vuxPos]*sin(3.14159*(upos-floor(upos)))*sin(3.14159*(vpos-floor(vpos)));
 		
 	color /= (scaline);
 	

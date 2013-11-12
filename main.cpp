@@ -351,7 +351,7 @@ int main(int argc, char * argv[])
 //    visualizers.push_back(&cubeMatrix);
 //    visualizers.push_back(&rmBoxFloor);
     
-	currentViz = &planeDeformSquareTunnel;
+	currentViz = &sparklingBlocks;
     
     float frameSlice = 0.0f;
     

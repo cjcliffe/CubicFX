@@ -50,10 +50,13 @@ void main( void ) {
    
      //move	
      sx += (time) / 1.0 * sign(pz);
-	
-	 int idx = int(mod(sx,1.0)*8.0)+int(mod(sy,1.0)*8.0)*8;
-     float color = vuData[abs(idx-64)%64]/6.0; //get2DTexture(sx * scaling, sy * scaling);  
-
+	 
+     float upos = mod(sx,1.0)*8.0;
+	 float vpos = mod(sy,1.0)*8.0;
+	 int idx = int(upos)+int(vpos)*8;
+     float color = vuData[abs(idx-64)%64]/6.0;
+	 color *= sin(3.14159*(upos-floor(upos)))*sin(3.14159*(vpos-floor(vpos)));
+	 
      //shading
     color *= pow(abs(pz),1.5)*280.0;	
 	

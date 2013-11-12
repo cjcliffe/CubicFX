@@ -29,7 +29,9 @@ vec4 s(vec2 px,float z)
         u=acos(x/sin(v))/(2.0*l)*120.0*sign(q)-k;
         v=v*60.0/l;
         q=cos(floor(v/l));
-        c = vuData[int(mod(floor(u/5.0)*5.0+floor(v/5.0),64.0))]*2.0;//+mod(v/10.0,1.0);//pow(abs(cos(u)*sin(v)),.2)*.1/(q+sin(float(int((u+l/2.0)/l))+k*.6+cos(q*25.0)))*pow(1.0-c,.9);
+		float upos = u/5.0;
+		float vpos = v/5.0;
+        c = vuData[int(mod(floor(upos)*5.0+floor(vpos),64.0))]*2.0;//+mod(v/10.0,1.0);//pow(abs(cos(u)*sin(v)),.2)*.1/(q+sin(float(int((u+l/2.0)/l))+k*.6+cos(q*25.0)))*pow(1.0-c,.9);
 		if (c>1.0) c = -c+1.0;
 		
         vec4 res;
@@ -37,6 +39,9 @@ vec4 s(vec2 px,float z)
            res = vec4(-c * randColor2,1.0); //vec4(-c/2.0,0.0,-c*2.0,1.0);
         else
            res = vec4(c * randColor,1.0); //vec4(c,c*2.0,c*2.0,1.0);
+		   
+		res.xyz *= 0.2+sin(3.14159*(upos-floor(upos)))*sin(3.14159*(vpos-floor(vpos)));
+		   
         return res;
     }
 }
