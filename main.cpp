@@ -242,6 +242,15 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 			case GLFW_KEY_I:
 				currentViz = visualizers[17];
 				break;
+			case GLFW_KEY_O:
+				currentViz = visualizers[18];
+				break;
+			case GLFW_KEY_P:
+				currentViz = visualizers[19];
+				break;
+			case GLFW_KEY_A:
+				currentViz = visualizers[20];
+				break;
 		}
     }
 
@@ -313,6 +322,9 @@ int main(int argc, char * argv[])
 	ShaderViz planeDeformFly("shaders/vertex_common.vs", "shaders/planed_fly.fs");
 	ShaderViz planeDeformReliefTunnel("shaders/vertex_common.vs", "shaders/planed_relief_tun.fs");
 	ShaderViz planeDeformSquareTunnel("shaders/vertex_common.vs", "shaders/planed_square_tun.fs");
+	ShaderViz hexTunnel("shaders/vertex_common.vs", "shaders/hex_tunnel.fs");
+	ShaderViz cubeScape("shaders/vertex_common.vs", "shaders/rm_cubescape.fs");
+	ShaderViz inversionMachine("shaders/vertex_common.vs", "shaders/inversion_machine.fs");
 
 //	ShaderViz roadToHell("shaders/vertex_common.vs", "shaders/road_to_hell.fs");
 
@@ -344,6 +356,9 @@ int main(int argc, char * argv[])
 	visualizers.push_back(&planeDeformFly);
 	visualizers.push_back(&planeDeformReliefTunnel);
 	visualizers.push_back(&planeDeformSquareTunnel);
+	visualizers.push_back(&hexTunnel);
+	visualizers.push_back(&cubeScape);
+	visualizers.push_back(&inversionMachine);
 
 
 //    visualizers.push_back(&torusSwirl);
@@ -351,7 +366,7 @@ int main(int argc, char * argv[])
 //    visualizers.push_back(&cubeMatrix);
 //    visualizers.push_back(&rmBoxFloor);
     
-	currentViz = &sparklingBlocks;
+	currentViz = &inversionMachine;
     
     float frameSlice = 0.0f;
     
