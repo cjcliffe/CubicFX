@@ -4,7 +4,8 @@ out vec4 outputF;
 uniform float time;
 uniform vec2 resolution;
 uniform float vuData[128];
-
+uniform float vuLow;
+ 
 uniform float timerKick;
 uniform vec3 randColor;
 // "The Inversion Machine" by Kali
@@ -42,7 +43,7 @@ vec3 normal(vec3 p) {
 			de(p+e.xyx)-de(p-e.xyx),
 			de(p+e.xxy)-de(p-e.xxy)
 			)
-		);	
+		);
 }
 
 float light(in vec3 p, in vec3 dir) {
@@ -64,7 +65,7 @@ float raymarch(in vec3 from, in vec3 dir)
 	vec3 p;
 	float ra=rand(uv.xy*time)-.5;
 	float ras=max(0.,sign(-.5+rand(vec2(1.3456,.3573)*floor(30.+time*20.))));
-	float rab=vuData[0]*5.0;//rand(vec2(1.2439,2.3453)*floor(10.+time*40.))*ras;
+	float rab=vuLow*5.0;//rand(vec2(1.2439,2.3453)*floor(10.+time*40.))*ras;
 	float rac=rand(vec2(1.1347,1.0331)*floor(40.+time));
 	float ral=rand(1.+floor(uv.yy*300.)*time)-.5;
 	for (int i=0; i<60; i++) {

@@ -18,6 +18,9 @@
 
 #pragma once
 
+#define VIZ_WIDTH 1280
+#define VIZ_HEIGHT 1024
+
 namespace CubicVR {
     
     
@@ -63,6 +66,8 @@ namespace CubicVR {
         
         float floatArrayAverage(float *data, int start, int end);
         float floatArrayAbsAverage(float *data, int start, int end);
+		float floatArrayMax(float *data, int start, int end);
+		
         
         void updateVariables(float time_value, vector<float> &sample_data, vector<float> &vu_data, BeatDetektorContest *contest);
         

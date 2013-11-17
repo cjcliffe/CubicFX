@@ -30,7 +30,7 @@
 #include "BeatDetektor.h"
 
 #define SRATE 44100
-#define BUF 1024
+#define BUF 2048
 
 using namespace std;
 
@@ -62,7 +62,7 @@ int initAudio() {
 		}
 	}
 
-	audio_device = alcCaptureOpenDevice(NULL, SRATE*2, AL_FORMAT_STEREO16, BUF);
+	audio_device = alcCaptureOpenDevice(NULL, SRATE, AL_FORMAT_STEREO16, BUF);
 	err = alGetError();
 	if (err != AL_NO_ERROR) {
 		switch (err) {
@@ -251,6 +251,15 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 			case GLFW_KEY_A:
 				currentViz = visualizers[20];
 				break;
+			case GLFW_KEY_S:
+				currentViz = visualizers[21];
+				break;
+			case GLFW_KEY_D:
+				currentViz = visualizers[22];
+				break;
+			case GLFW_KEY_F:
+				currentViz = visualizers[23];
+				break;
 		}
     }
 
@@ -269,18 +278,20 @@ int main(int argc, char * argv[])
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     
-    GLFWwindow *window = glfwCreateWindow(1280, 720, "BeatDetektor ShaderFX", NULL, NULL);
-//    GLFWwindow *window = glfwCreateWindow(1280, 720, "BeatDetektor ShaderFX", glfwGetPrimaryMonitor(), NULL);
-    
+	GLFWmonitor **monitors;
+	int numMonitors;
+	monitors = glfwGetMonitors(&numMonitors);
+
+    GLFWwindow *window = glfwCreateWindow(VIZ_WIDTH, VIZ_HEIGHT, "BeatDetektor ShaderFX", NULL, NULL);
+    //GLFWwindow *window = glfwCreateWindow(VIZ_WIDTH, VIZ_HEIGHT, "BeatDetektor ShaderFX", glfwGetPrimaryMonitor(), NULL);
+//	GLFWwindow *window = glfwCreateWindow(VIZ_WIDTH, VIZ_HEIGHT, "BeatDetektor ShaderFX", monitors[1], NULL);
+
     if (!window)
     {
         glfwTerminate();
         return -1;
     }
 
-	if (!initAudio()) {
-		return -1;
-	}
 
     glfwMakeContextCurrent(window);
     
@@ -325,6 +336,13 @@ int main(int argc, char * argv[])
 	ShaderViz hexTunnel("shaders/vertex_common.vs", "shaders/hex_tunnel.fs");
 	ShaderViz cubeScape("shaders/vertex_common.vs", "shaders/rm_cubescape.fs");
 	ShaderViz inversionMachine("shaders/vertex_common.vs", "shaders/inversion_machine.fs");
+	ShaderViz mengerJourney("shaders/vertex_common.vs", "shaders/menger_journey.fs");
+	ShaderViz aLotOfSpheres("shaders/vertex_common.vs", "shaders/a_lot_of_spheres.fs");
+	ShaderViz fractalGears("shaders/vertex_common.vs", "shaders/fractal_gears.fs");
+
+	if (!initAudio()) {
+		return -1;
+	}
 
 //	ShaderViz roadToHell("shaders/vertex_common.vs", "shaders/road_to_hell.fs");
 
@@ -359,14 +377,16 @@ int main(int argc, char * argv[])
 	visualizers.push_back(&hexTunnel);
 	visualizers.push_back(&cubeScape);
 	visualizers.push_back(&inversionMachine);
-
-
+	visualizers.push_back(&mengerJourney);
+	visualizers.push_back(&aLotOfSpheres);
+	visualizers.push_back(&fractalGears);
+	
 //    visualizers.push_back(&torusSwirl);
 //    visualizers.push_back(&rmCorridorBalls);
 //    visualizers.push_back(&cubeMatrix);
 //    visualizers.push_back(&rmBoxFloor);
     
-	currentViz = &inversionMachine;
+	currentViz = &fractalGears;
     
     float frameSlice = 0.0f;
     
@@ -380,10 +400,10 @@ int main(int argc, char * argv[])
             frameSlice = 0.0;
         }
 
-		captureAudio();
 
         if (frameSlice >= 1.0f/60.0f) {
-            visTimer.update();
+			visTimer.update();
+			captureAudio();
 
             processBD();
             

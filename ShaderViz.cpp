@@ -36,6 +36,16 @@ float ShaderViz::floatArrayAbsAverage(float *data, int start, int end) {
     return accum;
 }
 
+
+float ShaderViz::floatArrayMax(float *data, int start, int end) {
+	float maxv = 0;
+	for (int i = start; i < end; i++) {
+		if (data[i] > maxv) maxv = data[i];
+	}
+	
+	return maxv;
+}
+
 void ShaderViz::updateVariables(float time_value, vector<float> &sample_data, vector<float> &vu_data, BeatDetektorContest *contest) {
     
     a_vertexPosition.set(fsQuadMesh.getVBO()->gl_points);
@@ -59,7 +69,7 @@ void ShaderViz::updateVariables(float time_value, vector<float> &sample_data, ve
     }
     
     if (u_resolution.size) {
-        u_resolution.set(vec2(1280,720));
+        u_resolution.set(vec2(VIZ_WIDTH,VIZ_HEIGHT));
         u_resolution.update();
     }
     
@@ -84,7 +94,7 @@ void ShaderViz::updateVariables(float time_value, vector<float> &sample_data, ve
     }
     
     if (u_vuLow.size) {
-        u_vuLow.set(floatArrayAverage(&vu_data[0], 0, 5));
+		u_vuLow.set(floatArrayAverage(&vu_data[0], 0, 6));
         u_vuLow.update();
     }
     
@@ -137,7 +147,7 @@ void ShaderViz::updateVariables(float time_value, vector<float> &sample_data, ve
     }
 
     if (u_timerKick.size) {
-        timerKick += vu_data[0]*last_update*5.0;
+		timerKick += floatArrayAverage(&vu_data[0], 0, 6)*last_update*5.0;
         u_timerKick.set(timerKick);
         u_timerKick.update();
     }
@@ -161,7 +171,7 @@ void ShaderViz::display()
 {
     glClearColor(0.3f,0.3f,0.3f,1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glViewport(0, 0, 1280, 720);
+    glViewport(0, 0, VIZ_WIDTH, VIZ_HEIGHT);
 
     vizShader.use();
     

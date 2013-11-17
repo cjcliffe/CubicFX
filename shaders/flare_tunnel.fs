@@ -131,7 +131,7 @@ void main()
 {
 	float t = time * TimeScale;
 	
-	float d = 0.2+vuLow; //(sin((t - 5.0) / 3.0)*0.5+0.5);
+	float d = 0.2+vuLow*0.7; //(sin((t - 5.0) / 3.0)*0.5+0.5);
 	float mx = 0.5;
 	float my = 0.5;
 	
