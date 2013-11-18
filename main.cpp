@@ -30,7 +30,7 @@
 #include "BeatDetektor.h"
 
 #define SRATE 44100
-#define BUF 2048
+#define BUF 4096
 
 using namespace std;
 
@@ -189,7 +189,7 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
         switch (key) {
             case GLFW_KEY_1:
                 currentViz = visualizers[0];
-            break;
+				break;
             case GLFW_KEY_2:
                 currentViz = visualizers[1];
                 break;
@@ -201,29 +201,29 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
                 break;
             case GLFW_KEY_5:
                 currentViz = visualizers[4];
-                break;
+				break;
             case GLFW_KEY_6:
                 currentViz = visualizers[5];
-            break;
+				break;
             case GLFW_KEY_7:
                 currentViz = visualizers[6];
                 break;
             case GLFW_KEY_8:
                 currentViz = visualizers[7];
-            break;
+				break;
             case GLFW_KEY_9:
                 currentViz = visualizers[8];
-                break;
+				break;
             case GLFW_KEY_0:
                 currentViz = visualizers[9];
-            break;
+				break;
 
 			case GLFW_KEY_Q:
 				currentViz = visualizers[10];
-			break;
+				break;
 			case GLFW_KEY_W:
 				currentViz = visualizers[11];
-			break;
+				break;
 			case GLFW_KEY_E:
 				currentViz = visualizers[12];
 				break;
@@ -248,6 +248,7 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 			case GLFW_KEY_P:
 				currentViz = visualizers[19];
 				break;
+
 			case GLFW_KEY_A:
 				currentViz = visualizers[20];
 				break;
@@ -259,6 +260,15 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 				break;
 			case GLFW_KEY_F:
 				currentViz = visualizers[23];
+				break;
+			case GLFW_KEY_G:
+				currentViz = visualizers[24];
+				break;
+			case GLFW_KEY_H:
+				currentViz = visualizers[25];
+				break;
+			case GLFW_KEY_J:
+				currentViz = visualizers[26];
 				break;
 		}
     }
@@ -339,6 +349,9 @@ int main(int argc, char * argv[])
 	ShaderViz mengerJourney("shaders/vertex_common.vs", "shaders/menger_journey.fs");
 	ShaderViz aLotOfSpheres("shaders/vertex_common.vs", "shaders/a_lot_of_spheres.fs");
 	ShaderViz fractalGears("shaders/vertex_common.vs", "shaders/fractal_gears.fs");
+	ShaderViz metaBalls("shaders/vertex_common.vs", "shaders/metaballs.fs");
+	ShaderViz particleTracing("shaders/vertex_common.vs", "shaders/particle_tracing.fs");
+	ShaderViz flyingCubes("shaders/vertex_common.vs", "shaders/flying_cubes.fs");
 
 	if (!initAudio()) {
 		return -1;
@@ -380,13 +393,17 @@ int main(int argc, char * argv[])
 	visualizers.push_back(&mengerJourney);
 	visualizers.push_back(&aLotOfSpheres);
 	visualizers.push_back(&fractalGears);
+	visualizers.push_back(&metaBalls);
+	visualizers.push_back(&particleTracing);
+	visualizers.push_back(&flyingCubes);
+
 	
 //    visualizers.push_back(&torusSwirl);
 //    visualizers.push_back(&rmCorridorBalls);
 //    visualizers.push_back(&cubeMatrix);
 //    visualizers.push_back(&rmBoxFloor);
     
-	currentViz = &fractalGears;
+	currentViz = &flyingCubes;
     
     float frameSlice = 0.0f;
     

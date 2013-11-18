@@ -22,7 +22,7 @@ vec4 gear(vec2 uv, float dir, float phase) {
 	vec2 p = uv - 0.5;
 	
 	float r = length(p);
-	float t = fract(timerKick); //smoothstep(0.0, 1.0, fract(beatCounterQuarter/4.0));
+	float t = fract(2.0*timerKick); //smoothstep(0.0, 1.0, fract(beatCounterQuarter/4.0));
 	t *= 2.0 * PI / 6.0;
 	float a = atan(p.y, p.x) + (phase + t) * dir;
 	float e = 0.20 + clamp(sin(a * 6.0) * 0.13, 0.0, 0.1);
