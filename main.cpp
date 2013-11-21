@@ -30,7 +30,7 @@
 #include "BeatDetektor.h"
 
 #define SRATE 44100
-#define BUF 4096
+#define BUF 2048
 
 using namespace std;
 
@@ -403,7 +403,7 @@ int main(int argc, char * argv[])
 //    visualizers.push_back(&cubeMatrix);
 //    visualizers.push_back(&rmBoxFloor);
     
-	currentViz = &flyingCubes;
+	currentViz = &vizRgbFlares;
     
     float frameSlice = 0.0f;
     

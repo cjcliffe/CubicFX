@@ -19,7 +19,7 @@
 #pragma once
 
 #define VIZ_WIDTH 1280
-#define VIZ_HEIGHT 1024
+#define VIZ_HEIGHT 720
 
 namespace CubicVR {
     

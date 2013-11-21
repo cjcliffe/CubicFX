@@ -480,7 +480,7 @@ void BeatDetektorVU::process(BeatDetektor *detector, float last_update, float cu
 	{
 		bool det = 1;
 		
-		float det_val = (detector->a_freq_range[i]/detector->ma_freq_range[i])*0.75;
+		float det_val = (detector->a_freq_range[i] / ((detector->ma_freq_range[i] + detector->maa_freq_range[i]) / 2.0))*0.8;
 		
 		if (det_val != det_val) det_val = 0;
 		
@@ -496,7 +496,7 @@ void BeatDetektorVU::process(BeatDetektor *detector, float last_update, float cu
 		}
 		else 
 		{
-			if (current_bpm) vu_levels[i] -= 6.0*(vu_levels[i]*last_update);
+			if (current_bpm) vu_levels[i] -= 8.0*(vu_levels[i]*last_update);
 		}
 		
 		if (vu_levels[i] < 0 || vu_levels[i] != vu_levels[i]) vu_levels[i] = 0;
