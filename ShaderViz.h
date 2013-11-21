@@ -53,7 +53,12 @@ namespace CubicVR {
         shaderUniformFloat u_timerMid;
         shaderUniformFloat u_timerHigh;
         shaderUniformFloat u_sampleRange;
+
+		shaderUniformSampler2D u_samplerTex;
         
+		GLuint samplerTex;
+		GLuint samplerTexSampler;
+
         vec3 randColor, randColor2;
         int lastBeat;
         float lastTime;

@@ -19,9 +19,9 @@ void main( void ) {
 	vec2 uPos = ( gl_FragCoord.xy / resolution.y );//normalize wrt y axis
 	uPos -= vec2((resolution.x/resolution.y)/2.0, 0.5);//shift origin to center
 	
-	float multiplier = 0.00001;
+	float multiplier = 0.0000001;
 	const float step = 0.004;
-	const float loop = 100.0;
+	const float loop = 80.0;
 	const float timeSCale = 0.75;
 
 	
@@ -31,7 +31,7 @@ void main( void ) {
 		vec2 point = 1.2*vec2(0.5*sin(t*4.0+200.0), 0.75*sin(t+10.0));
 		point += 1.2*vec2(0.85*cos(t*2.0), 0.45*sin(t*3.0));
 		point /= 2.0;
-		float componentColor= (multiplier+0.02*vuLow)/((uPos.x-point.x)*(uPos.x-point.x) + (uPos.y-point.y)*(uPos.y-point.y))/i;
+		float componentColor= (multiplier+0.01*vuLow)/((uPos.x-point.x)*(uPos.x-point.x) + (uPos.y-point.y)*(uPos.y-point.y))/i;
 		redGodColor += vec3(componentColor, componentColor/3.0, componentColor/3.0);
 	}
 	
@@ -41,7 +41,7 @@ void main( void ) {
 		vec2 point = 1.2*vec2(0.75*sin(t), 0.5*sin(t));
 		point += 1.2*vec2(0.75*cos(t*4.0), 0.5*sin(t*3.0));
 		point /= 2.0;
-		float componentColor= (multiplier+0.02*vuMid)/((uPos.x-point.x)*(uPos.x-point.x) + (uPos.y-point.y)*(uPos.y-point.y))/i;
+		float componentColor= (multiplier+0.01*vuMid)/((uPos.x-point.x)*(uPos.x-point.x) + (uPos.y-point.y)*(uPos.y-point.y))/i;
 		blueGodColor += vec3(componentColor/3.0, componentColor/3.0, componentColor);
 	}
 	
@@ -51,7 +51,7 @@ void main( void ) {
 		vec2 point = 1.2*vec2(0.75*sin(t*3.0+20.0), 0.45*sin(t*2.0+40.0));
 		point += 1.2*vec2(0.35*cos(t*2.0+100.0), 0.5*sin(t*3.0));
 		point /= 2.0;
-		float componentColor= (multiplier+0.02*vuHigh)/((uPos.x-point.x)*(uPos.x-point.x) + (uPos.y-point.y)*(uPos.y-point.y))/i;
+		float componentColor= (multiplier+0.01*vuHigh)/((uPos.x-point.x)*(uPos.x-point.x) + (uPos.y-point.y)*(uPos.y-point.y))/i;
 		greenGodColor += vec3(componentColor/3.0, componentColor, componentColor/3.0);
 	}
 	

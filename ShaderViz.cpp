@@ -1,4 +1,4 @@
-//
+﻿//
 //  ShaderViz.cpp
 //
 //  Copyright (c) 2013 Charles J. Cliffe. All rights reserved.
@@ -164,6 +164,17 @@ void ShaderViz::updateVariables(float time_value, vector<float> &sample_data, ve
         u_timerHigh.update();
     }
 
+	if (u_samplerTex.size) {
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_1D, samplerTex);
+		glBindSampler(0, samplerTexSampler);
+		glPixelStorei(GL_UNPACK_ALIGNMENT,2);
+		glTexImage1D(GL_TEXTURE_1D, 0, GL_R32F, 1024, 0, GL_RED, GL_FLOAT, &sample_data[0]);
+		u_samplerTex.set(0);
+		u_samplerTex.update();
+
+//		cout << samplerTexVal[1023] << endl;
+	}
 }
 
 
@@ -227,6 +238,17 @@ void ShaderViz::init(string vsFn, string fsFn) {
     u_timerHigh = shaderVars.getUniform("timerHigh");
     u_sampleRange = shaderVars.getUniform("sampleRange");
     
+	glGenTextures(1, &samplerTex);
+	glBindTexture(GL_TEXTURE_1D, samplerTex);
+
+	glGenSamplers(1, &samplerTexSampler);
+	glSamplerParameteri(samplerTexSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glSamplerParameteri(samplerTexSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+	u_samplerTex = shaderVars.getUniform("samplerTex");
+
+
+
     fsQuadMesh.addPoint(vec3(-1.0f, -1.0f, -1.0f));
     fsQuadMesh.addPoint(vec3(1.0f, -1.0f, -1.0f));
     fsQuadMesh.addPoint(vec3(1.0f, 1.0f, -1.0f));

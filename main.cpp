@@ -35,7 +35,7 @@
 using namespace std;
 
 ALCdevice *audio_device;
-ALbyte audio_buffer[SRATE];
+ALbyte audio_buffer[SRATE*2];
 ALint samples;
 
 vector<float> sample_data;
@@ -270,6 +270,15 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 			case GLFW_KEY_J:
 				currentViz = visualizers[26];
 				break;
+			case GLFW_KEY_K:
+				currentViz = visualizers[27];
+				break;
+			case GLFW_KEY_L:
+				currentViz = visualizers[28];
+				break;
+			case GLFW_KEY_Z:
+				currentViz = visualizers[29];
+				break;
 		}
     }
 
@@ -326,16 +335,16 @@ int main(int argc, char * argv[])
 
     
     ShaderViz vizRgbFlares("shaders/vertex_common.vs", "shaders/rgb_flares_in_tunnel.fs");
-    ShaderViz rbCrawl("shaders/vertex_common.vs", "shaders/red_blue_crawl_pattern.fs");
+	ShaderViz sparklingSine("shaders/vertex_common.vs", "shaders/sparkling_sine_wave.fs");
+	ShaderViz sparklingBlocks("shaders/vertex_common.vs", "shaders/sparkling_blocks.fs");
+	ShaderViz flareWave("shaders/vertex_common.vs", "shaders/flare_wave.fs");
+	ShaderViz rbCrawl("shaders/vertex_common.vs", "shaders/red_blue_crawl_pattern.fs");
     ShaderViz rmTunnel("shaders/vertex_common.vs", "shaders/raymarch_tunnel.fs");
     ShaderViz discoFloor("shaders/vertex_common.vs", "shaders/discofloor_ceiling.fs");
-    ShaderViz sparklingSine("shaders/vertex_common.vs", "shaders/sparkling_sine_wave.fs");
     ShaderViz flareTunnel("shaders/vertex_common.vs", "shaders/flare_tunnel.fs");
     ShaderViz colorSpiral("shaders/vertex_common.vs","shaders/color_spiral_complex.fs");
-    ShaderViz sparklingBlocks("shaders/vertex_common.vs","shaders/sparkling_blocks.fs");
     ShaderViz mandelBlob("shaders/vertex_common.vs","shaders/raymarch_fractal3d.fs");
     ShaderViz lineZoom("shaders/vertex_common.vs","shaders/raymarch_lines_zoom.fs");
-	ShaderViz flareWave("shaders/vertex_common.vs", "shaders/flare_wave.fs");
 	ShaderViz renderObjs("shaders/vertex_common.vs", "shaders/render_objects.fs");
 	ShaderViz hexField("shaders/vertex_common.vs", "shaders/hex_twist_field.fs");
 	ShaderViz discoBall("shaders/vertex_common.vs", "shaders/discoball.fs");
@@ -352,6 +361,9 @@ int main(int argc, char * argv[])
 	ShaderViz metaBalls("shaders/vertex_common.vs", "shaders/metaballs.fs");
 	ShaderViz particleTracing("shaders/vertex_common.vs", "shaders/particle_tracing.fs");
 	ShaderViz flyingCubes("shaders/vertex_common.vs", "shaders/flying_cubes.fs");
+	ShaderViz spaceShip("shaders/vertex_common.vs", "shaders/spaceship.fs");
+	ShaderViz spaceRings("shaders/vertex_common.vs", "shaders/space_rings.fs");
+	ShaderViz hologram("shaders/vertex_common.vs", "shaders/hologram.fs");
 
 	if (!initAudio()) {
 		return -1;
@@ -370,16 +382,16 @@ int main(int argc, char * argv[])
     //            vizShader.loadTextFile("shaders/vertex_common.vs", "shaders/binary_tunnel.fs");
     
     visualizers.push_back(&vizRgbFlares);
-    visualizers.push_back(&rbCrawl);
+	visualizers.push_back(&sparklingSine);
+	visualizers.push_back(&sparklingBlocks);
+	visualizers.push_back(&flareWave);
+	visualizers.push_back(&rbCrawl);
     visualizers.push_back(&rmTunnel);
     visualizers.push_back(&discoFloor);
-    visualizers.push_back(&sparklingSine);
     visualizers.push_back(&flareTunnel);
     visualizers.push_back(&colorSpiral);
-    visualizers.push_back(&sparklingBlocks);
     visualizers.push_back(&mandelBlob);
     visualizers.push_back(&lineZoom);
-	visualizers.push_back(&flareWave);
 	visualizers.push_back(&renderObjs);
 	visualizers.push_back(&hexField);
 	visualizers.push_back(&discoBall);
@@ -389,13 +401,16 @@ int main(int argc, char * argv[])
 	visualizers.push_back(&planeDeformSquareTunnel);
 	visualizers.push_back(&hexTunnel);
 	visualizers.push_back(&cubeScape);
-	visualizers.push_back(&inversionMachine);
-	visualizers.push_back(&mengerJourney);
 	visualizers.push_back(&aLotOfSpheres);
 	visualizers.push_back(&fractalGears);
+	visualizers.push_back(&inversionMachine);
+	visualizers.push_back(&mengerJourney);
 	visualizers.push_back(&metaBalls);
 	visualizers.push_back(&particleTracing);
 	visualizers.push_back(&flyingCubes);
+	visualizers.push_back(&spaceShip);
+	visualizers.push_back(&spaceRings);
+	visualizers.push_back(&hologram);
 
 	
 //    visualizers.push_back(&torusSwirl);
@@ -403,7 +418,7 @@ int main(int argc, char * argv[])
 //    visualizers.push_back(&cubeMatrix);
 //    visualizers.push_back(&rmBoxFloor);
     
-	currentViz = &vizRgbFlares;
+	currentViz = &hologram;
     
     float frameSlice = 0.0f;
     
