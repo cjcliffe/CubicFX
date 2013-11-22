@@ -6,7 +6,7 @@ uniform vec2 resolution;
 uniform float timerKick;
 uniform float vuData[128];
 uniform vec3 randColor;
-
+uniform float blendAlpha;
 
 
 // twitter: @eddbiddulph
@@ -137,4 +137,5 @@ void main(void)
 	// render the particles
 	outputF.rgb = traverseUniformGrid(ro, rd);
 	outputF.rgb = sqrt(outputF.rgb * 0.8);
+	outputF.a = blendAlpha;
 }

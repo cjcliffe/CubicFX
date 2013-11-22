@@ -96,6 +96,7 @@ vec3 intersect(in vec3 rayOrigin, in vec3 rayDir)
 	return color;
 }
 
+uniform float blendAlpha;
 void main()
 {
 	vec3 upDirection = vec3(0, -1, 0);
@@ -109,4 +110,5 @@ void main()
 	vec3 rayDir = normalize(u * screenPos.x + v * screenPos.y + cameraDir*(1.0-length(screenPos)*0.5));
 	
 	outputF = vec4(intersect(cameraOrigin, rayDir), 1.0);
+	outputF.a = blendAlpha;
 } 

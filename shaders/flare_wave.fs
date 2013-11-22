@@ -5,6 +5,7 @@ uniform float time;
 uniform vec2 resolution;
 uniform sampler1D samplerTex;
 uniform float sampleRange;
+uniform float blendAlpha;
 
 #define PI 14.14159
 
@@ -21,6 +22,6 @@ void main( void ) {
 	float sx = amp * sinVal;
 	float dy = 1./ ( wsec * abs(p.y - sx));
 	//dy += 1./ (wpri * length(p - vec2(p.x, 0.)));
-	outputF = vec4( (p.x + 0.5) * dy, 0.5 * dy, dy, 1.0 );
-
+	outputF = vec4( (p.x + 0.5) * dy, 0.5 * dy, dy, blendAlpha );
+	
 }

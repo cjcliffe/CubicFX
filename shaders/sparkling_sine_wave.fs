@@ -9,6 +9,7 @@ uniform vec2 resolution;
 uniform sampler1D samplerTex;
 uniform float sampleRange;
 uniform vec3 randColor;
+uniform float blendAlpha;
 
 uniform float vuData[128];
 
@@ -36,6 +37,6 @@ void main( void ) {
 	color /= (scaline);
 	
 	
-	outputF = vec4(color, 1.0);
+	outputF = vec4(color, blendAlpha);
 	//outputF = vec4(vec3(texture(samplerTex,gl_FragCoord.x/resolution.x).r/32767.0),1.0);
 }

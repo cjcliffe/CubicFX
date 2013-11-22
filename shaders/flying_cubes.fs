@@ -7,6 +7,7 @@ uniform float timerKick;
 uniform float vuLow;
 uniform float vuData[128];
 uniform vec3 randColor;
+uniform float blendAlpha;
 
 vec3 planeVUMatrix(vec2 uv) {
 	float upos = mod(uv.x,1.0)*8.0;
@@ -122,6 +123,6 @@ void main(void)
 		outputF = vec4(bg, 1.0);
 	}
 		
-
+	outputF.a = blendAlpha;
 		
 }

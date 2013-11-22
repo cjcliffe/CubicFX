@@ -68,6 +68,7 @@ const float Pi = 3.14159;
 const int zoom = 80;
 const float speed = 0.05;
 float fScale = 2.0;
+uniform float blendAlpha;
 
 void main(void)
 {
@@ -111,4 +112,5 @@ void main(void)
 	}
 	
 	outputF=vec4(cbuff.rgb, 1.0);
+	outputF.a = blendAlpha;
 }

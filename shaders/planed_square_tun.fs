@@ -8,6 +8,7 @@ uniform vec2 resolution;
 uniform float vuData[128];
 uniform vec3 randColor;
 uniform float timerKick;
+uniform float blendAlpha;
 
 vec3 planeVUMatrix(vec2 uv) {
 	float upos = mod(uv.x,1.0)*8.0;
@@ -33,6 +34,6 @@ void main(void)
 
     vec3 col =  planeVUMatrix(uv*6.0);
 
-    outputF = vec4(col*r*r*8.0,1.0);
+    outputF = vec4(col*r*r*8.0,blendAlpha);
 }
     

@@ -6,6 +6,7 @@ uniform float time;
 
 uniform float vuData[128];
 uniform vec3 randColor;
+uniform float blendAlpha;
 
 vec3 planeVUMatrix(vec2 uv) {
 	float upos = mod(uv.x,1.0)*8.0;
@@ -45,5 +46,5 @@ void main(void)
     ao = smoothstep(0.0,0.4,ao)-smoothstep(0.4,0.7,ao);
     ao = 1.0-0.5*ao*r;
 
-    outputF = vec4(col*w*ao*6.0,1.0);
+    outputF = vec4(col*w*ao*6.0,blendAlpha);
 }

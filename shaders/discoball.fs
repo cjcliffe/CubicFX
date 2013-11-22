@@ -7,6 +7,7 @@ uniform float time;
 uniform float vuData[128];
 uniform vec3 randColor, randColor2;
 uniform float timerKick;
+uniform float blendAlpha;
 
 vec4 s(vec2 px,float z)
 {
@@ -55,5 +56,6 @@ void main(void)
         c+=s(p,1.0-float(i)/80.0)*(.008-float(i)*.00005);
     vec4 d=s(p,1.0);
     outputF = (d.a==0.0?s(p,-.2)*.02:d)+sqrt(c);
+	outputF.a = blendAlpha;
 }
 

@@ -6,6 +6,7 @@ uniform vec2 resolution;
 uniform int beatCounterQuarter,beatCounter;
 uniform float timerKick;
 uniform vec3 randColor;
+uniform float blendAlpha;
 
 #define PI 3.14159265359
 #define GEAR_PHASE 0.0958
@@ -61,4 +62,5 @@ void main(void)
 	vec4 col = gears(fract(uv2));
 	
 	outputF = vec4(randColor,1.0) * col ; //+ vec4(abs(dot(uv, normalize(uv2))) * 0.25) * (1.0 - col.a);
+	outputF.a = blendAlpha;
 }

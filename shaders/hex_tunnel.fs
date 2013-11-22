@@ -11,6 +11,7 @@ uniform float timerKick;
 uniform vec2 resolution;
 uniform float vuData[128];
 uniform vec3 randColor,randColor2;
+uniform float blendAlpha;
 
 float slices = 0.2+vuData[0];//cos(time * 0.8) * 0.3 + 0.4;
 
@@ -114,5 +115,5 @@ void main(void)
 	// iq's vignetting
 	col *= 0.1 + 0.8 * pow(16.0 * pos.x * pos.y * (1.0 - pos.x) * (1.0 - pos.y), 0.1);
 	
-    outputF = vec4(col, 1.0);
+    outputF = vec4(col, blendAlpha);
 }

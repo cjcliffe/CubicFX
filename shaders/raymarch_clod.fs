@@ -77,9 +77,11 @@ vec3 s(vec3 o,vec3 d)
 }
 #endif
 
+uniform float blendAlpha;
 void main()
 {
     vec2 p = -1.0 + 2.0 * gl_FragCoord.xy / resolution.xy;
     outputF=vec4(s(vec3(sin(time*1.5)*.5,cos(time)*.5,time), normalize(vec3(p.xy,1.0))),1.0);
+	outputF.a = blendAlpha;
 }
     

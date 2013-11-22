@@ -7,6 +7,7 @@ uniform vec2 resolution;
 uniform float vuData[128];
 uniform vec3 randColor;
 uniform float timerKick;
+uniform float blendAlpha;
 
 vec3 planeVUMatrix(vec2 uv) {
 	float upos = mod(uv.x,1.0)*8.0;
@@ -257,5 +258,5 @@ void main(void)
 	color=clamp(color,vec3(.0),vec3(1.));
 	color=pow(color,vec3(GAMMA))*BRIGHTNESS;
 	color=mix(vec3(length(color)),color,SATURATION);
-	outputF = vec4(color,1.);
+	outputF = vec4(color,blendAlpha);
 }

@@ -31,7 +31,7 @@ vec3 field(vec3 p) {
 }
 
 
-
+uniform float blendAlpha;
 void main( void ) {
 	//float jit = 0.01;
 	//if (mod(time, 1.1) < 0.5) jit = 0.001;
@@ -53,4 +53,5 @@ void main( void ) {
 	vec3 color3 = vec3(1.-1./(1.+color*(.09/float(MAXITER*MAXITER))));
 	color3 *= color3;
 	outputF = vec4(randColor*vec3(color3.r+color3.g+color3.b),1.);
+	outputF.a = blendAlpha;
 }

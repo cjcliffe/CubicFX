@@ -8,6 +8,8 @@ uniform float vuLow;
  
 uniform float timerKick;
 uniform vec3 randColor;
+uniform float blendAlpha;
+
 // "The Inversion Machine" by Kali
 
 const float width=.22;
@@ -94,7 +96,7 @@ float raymarch(in vec3 from, in vec3 dir)
 
 void main(void)
 {
-	float t=(time)*.2;
+	float t=(time+timerKick)*.2;
 	vec2 uv = gl_FragCoord.xy / resolution.xy*2.-1.;
 	uv.y*=resolution.y/resolution.x;
 	vec3 from=vec3(0.,0.1,-1.2);
@@ -103,5 +105,5 @@ void main(void)
 	dir.xy=dir.xy*rot;
 	float col=raymarch(from,dir); 
 	col=pow(col,1.25);
-	outputF = vec4(randColor.xyz*col,1.0);
+	outputF = vec4(randColor.xyz*col,blendAlpha);
 }

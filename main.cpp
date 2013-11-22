@@ -51,6 +51,9 @@ BeatDetektor *det;
 BeatDetektorVU *vu;
 BeatDetektorContest *contest;
 
+float alphaVec;
+float alphaVal = 1.0;
+
 int initAudio() {
 	ALenum err = alGetError();
 	const ALchar *pDeviceList = alcGetString(NULL, ALC_CAPTURE_DEVICE_SPECIFIER);
@@ -279,9 +282,32 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 			case GLFW_KEY_Z:
 				currentViz = visualizers[29];
 				break;
+
+
+			// Alpha setting
+			case GLFW_KEY_PAGE_DOWN:
+				alphaVec = (mods&GLFW_MOD_SHIFT)?4.0 : 1.0;
+				break;
+			case GLFW_KEY_PAGE_UP:
+				alphaVec = (mods&GLFW_MOD_SHIFT) ? -4.0 : -1.0;
+				break;
 		}
     }
 
+	if (action == GLFW_RELEASE) {
+		switch (key) {
+			case GLFW_KEY_PAGE_DOWN:
+				if (alphaVec > 0.0) {
+					alphaVec = 0.0;
+				}
+				break;
+			case GLFW_KEY_PAGE_UP:
+				if (alphaVec < 0.0) {
+					alphaVec = 0.0;
+				}
+				break;
+		}
+	}
 }
 
 
@@ -438,8 +464,17 @@ int main(int argc, char * argv[])
 			captureAudio();
 
             processBD();
+
+			if (alphaVec) {
+				alphaVal += alphaVec*visTimer.lastUpdateSeconds()*0.1;
+			}
             
+			currentViz->setBlendAlpha(alphaVal);
             currentViz->updateVariables(visTimer.getSeconds(),sample_data,vu->vu_levels,contest);
+
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
             currentViz->display();
             
             glfwSwapBuffers(window);

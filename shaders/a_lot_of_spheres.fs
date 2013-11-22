@@ -6,6 +6,7 @@ uniform vec2 resolution;
 uniform float vuData[128];
 uniform vec3 randColor;
 uniform float timerKick;
+uniform float blendAlpha;
 
 // Created by Reinder Nijhoff 2013
 
@@ -271,5 +272,5 @@ void main(void) {
 	// vigneting
 	col *= 0.25+0.75*pow( 16.0*q.x*q.y*(1.0-q.x)*(1.0-q.y), 0.15 );
 	
-	outputF = vec4( col,1.0);
+	outputF = vec4( col, blendAlpha);
 }

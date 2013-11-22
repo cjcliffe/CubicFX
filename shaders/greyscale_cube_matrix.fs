@@ -38,6 +38,7 @@ float castRay(vec3 o,vec3 d) {
 	return MAX;
 }
 
+uniform float blendAlpha;
 void main() {
 	vec2 p=(gl_FragCoord.xy/resolution.y)*1.0;
 	p.x-=resolution.x/resolution.y*0.5;p.y-=0.5;
@@ -54,4 +55,5 @@ void main() {
 	else {
 		outputF = vec4(0.0,0.0,0.0,1.0);
 	}
+	outputF.a = blendAlpha;
 }

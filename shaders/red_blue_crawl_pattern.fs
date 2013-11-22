@@ -11,6 +11,7 @@ uniform float timerKick;
 uniform int beatCounter;
 uniform vec3 randColor;
 uniform vec3 randColor2;
+uniform float blendAlpha;
 
 #define PI 3.14159
 #define TWO_PI (PI*2.0)
@@ -38,5 +39,5 @@ void main(void)
 	
 	col /= 3.0;
 
-	outputF = vec4(randColor * clamp(vec3(col*1.0, col*1.0, col*1.0),0.0,1.0) + randColor2 * clamp(-vec3(col*1.0, col*1.0, col*1.0),0.0,1.0), 1.0);
+	outputF = vec4(randColor * clamp(vec3(col*1.0, col*1.0, col*1.0),0.0,1.0) + randColor2 * clamp(-vec3(col*1.0, col*1.0, col*1.0),0.0,1.0), blendAlpha);
 }

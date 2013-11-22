@@ -76,6 +76,7 @@ vec2 inObj(in vec3 p){
 }
 
 //Scene End
+uniform float blendAlpha;
 
 void main(void){
   vec2 vPos=-1.0+2.0*gl_FragCoord.xy/resolution.xy;
@@ -127,4 +128,5 @@ void main(void){
 //  fc.rgb *= mod(gl_FragCoord.x, 2.0);
   fc.rgb *= mod(gl_FragCoord.y, 2.0);
   outputF=fc;
+  outputF.a = blendAlpha;
 }

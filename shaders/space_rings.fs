@@ -6,7 +6,7 @@ uniform float timerKick;
 uniform vec2 resolution;
 uniform float vuLow;
 uniform int beatCounter;
-
+uniform float blendAlpha;
 
 /*by mu6k, Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 
@@ -323,5 +323,5 @@ void main(void)
 	color -= hash(color.xy+uv.xy)*.015;
 	color -= length(uv)*.1;
 	color =cc(color,.5,.6);
-	outputF = vec4(color,1.0);
+	outputF = vec4(color,blendAlpha);
 }

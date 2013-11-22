@@ -60,7 +60,7 @@ vec2 hologramInterval(vec3 ro, vec3 rd)
 
 float hologramBrightness(vec2 p)
 {
-	return dot(planeVUMatrix(p).rgb, vec3(1.0 / 3.0));
+	return dot(planeVUMatrix(p*3.0).rgb, vec3(1.0 / 3.0));
 }
 
 float flicker(float x)
@@ -128,6 +128,8 @@ vec3 floorTex(vec3 ro, vec3 rd)
 			   		(1.0 - wires) * vec3(randColor * sqrt(elec) * 0.3 / length(tc)), hit);
 }
 
+uniform float blendAlpha;
+
 void main(void)
 {
 	vec2 uv = (gl_FragCoord.xy / resolution.xy - vec2(0.5)) * 2.0;
@@ -165,5 +167,5 @@ void main(void)
 	}
 	
 	outputF.rgb = fl + accum * cov * (len / float(ITERS)) * 0.4;
-	outputF.a = 1.0;
+	outputF.a = blendAlpha;
 }

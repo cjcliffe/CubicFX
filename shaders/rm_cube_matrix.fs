@@ -34,6 +34,8 @@ vec3 getNormal(vec3 p)
     );
 }
  
+uniform float blendAlpha;
+
 void main() {
 	vec2 pos = (gl_FragCoord.xy*2.0 -resolution) / resolution.y;
 	
@@ -66,5 +68,5 @@ void main() {
 	}else{
 		outputF = vec4(0.0);
 	}
-	
+	outputF.a = blendAlpha;
 }

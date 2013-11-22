@@ -9,6 +9,7 @@ uniform vec2 resolution;
 uniform float vuData[128];
 uniform vec3 randColor;
 uniform float timerKick;
+uniform float blendAlpha;
 
 float get2DTexture(float x, float y)
 {
@@ -60,6 +61,6 @@ void main( void ) {
      //shading
     color *= pow(abs(pz),1.5)*280.0;	
 	
-     outputF = vec4( randColor*color,  1.0);
+     outputF = vec4( randColor*color,  blendAlpha);
 
 }

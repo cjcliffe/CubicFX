@@ -46,6 +46,11 @@ float ShaderViz::floatArrayMax(float *data, int start, int end) {
 	return maxv;
 }
 
+void ShaderViz::setBlendAlpha(float val) {
+	u_blendAlpha.set(val);
+}
+
+
 void ShaderViz::updateVariables(float time_value, vector<float> &sample_data, vector<float> &vu_data, BeatDetektorContest *contest) {
     
     a_vertexPosition.set(fsQuadMesh.getVBO()->gl_points);
@@ -175,13 +180,17 @@ void ShaderViz::updateVariables(float time_value, vector<float> &sample_data, ve
 
 //		cout << samplerTexVal[1023] << endl;
 	}
+
+	if (u_blendAlpha.size) {
+		u_blendAlpha.update();
+	}
 }
 
 
 void ShaderViz::display()
 {
     glClearColor(0.3f,0.3f,0.3f,1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClear(GL_DEPTH_BUFFER_BIT); //GL_COLOR_BUFFER_BIT | 
     glViewport(0, 0, VIZ_WIDTH, VIZ_HEIGHT);
 
     vizShader.use();
@@ -238,6 +247,8 @@ void ShaderViz::init(string vsFn, string fsFn) {
     u_timerHigh = shaderVars.getUniform("timerHigh");
     u_sampleRange = shaderVars.getUniform("sampleRange");
     
+	u_blendAlpha = shaderVars.getUniform("blendAlpha");
+
 	glGenTextures(1, &samplerTex);
 	glBindTexture(GL_TEXTURE_1D, samplerTex);
 

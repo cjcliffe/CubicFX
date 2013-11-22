@@ -25,6 +25,7 @@ bool zero(vec2 pos) {
 	return d > 0.3 && d < 0.4;
 }
 
+uniform float blendAlpha;
 void main( void ) {
 
 	vec2 position = gl_FragCoord.xy / resolution.xy;
@@ -65,4 +66,5 @@ void main( void ) {
 	}
 
 	outputF = vec4(vec3(0.0, 0.7, 0.7) * float(w) / pow(cp.z * 80.0, 2.0) * (1.0 - abs(sin(floor(sp.y))) * 0.995), 1.0);
+	outputF.a = blendAlpha;
 }

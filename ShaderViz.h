@@ -53,6 +53,7 @@ namespace CubicVR {
         shaderUniformFloat u_timerMid;
         shaderUniformFloat u_timerHigh;
         shaderUniformFloat u_sampleRange;
+		shaderUniformFloat u_blendAlpha;
 
 		shaderUniformSampler2D u_samplerTex;
         
@@ -62,7 +63,7 @@ namespace CubicVR {
         vec3 randColor, randColor2;
         int lastBeat;
         float lastTime;
-        
+		        
         float timerKick, timerMid, timerHigh;
         
         Mesh fsQuadMesh;
@@ -75,7 +76,7 @@ namespace CubicVR {
 		
         
         void updateVariables(float time_value, vector<float> &sample_data, vector<float> &vu_data, BeatDetektorContest *contest);
-        
+		void setBlendAlpha(float val);
         
         void display();
         

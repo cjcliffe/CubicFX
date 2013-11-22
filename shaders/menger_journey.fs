@@ -7,6 +7,7 @@ uniform float timerKick;
 uniform vec3 randColor;
 uniform vec3 randColor2;
 uniform float vuLow;
+uniform float blendAlpha;
 
 #define MaxSteps 25
 #define MinimumDistance 0.0009
@@ -157,6 +158,7 @@ void main(void)
 	vec3 rayDir = normalize(camDir + (coord.x*camRight + coord.y*camUp)*FieldOfView);
 	
 	outputF = rayMarch(camPos, rayDir);
+	outputF.a = blendAlpha;
 }
 
 

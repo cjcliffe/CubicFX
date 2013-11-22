@@ -11,6 +11,7 @@ uniform float vuMid;
 uniform float vuHigh;
 uniform float vuData[128];
 uniform vec3 randColor;
+uniform float blendAlpha;
 
 const float PI = 3.1416;
 const float TWOPI = 2.0*PI; 
@@ -80,5 +81,5 @@ void main( void ) {
 	color += blueGodColor+redGodColor+greenGodColor;
 
 
-	outputF = vec4(color, 1.0);
+	outputF = vec4(color, blendAlpha);
 }

@@ -93,6 +93,7 @@ vec3 cubeIndex(vec3 p)
 
 uniform float vuData[128];
 uniform vec3 randColor;
+uniform float blendAlpha;
 
 void main(void)
 {
@@ -153,5 +154,5 @@ void main(void)
 		p = CAM_POS + fragWorldToCamPos * f;
 	}
 	
-	outputF = vec4(col, 1.0);
+	outputF = vec4(col, blendAlpha);
 }

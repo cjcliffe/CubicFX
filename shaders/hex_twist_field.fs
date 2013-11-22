@@ -62,7 +62,8 @@ vec3 map(vec3 p) {
 		
 uniform vec3 randColor;		
 uniform float vuData[128];		
-		
+uniform float blendAlpha;
+
 void main( void ) {
 	vec2 uv    = -1.0 + 2.0 * ( gl_FragCoord.xy / resolution.xy );
 	
@@ -106,6 +107,7 @@ void main( void ) {
 	//fcol = tv(fcol, uv);
 	outputF = fcol;
 	outputF *= mod(gl_FragCoord.y, 2.0);
+	outputF.a = blendAlpha;
 	//gl_FragColor *= mod(gl_FragCoord.y, 2.0) + sin(gl_FragCoord.y * 0.05 + (time * 5.0)) * 0.5;
 	//gl_FragColor *= mod(gl_FragCoord.x, 2.0);
 }

@@ -35,7 +35,7 @@ float map(vec3 p)
     return 0.5*log(r)*r/d;
 }
 
-
+uniform float blendAlpha;
 void main( void )
 {
     vec2 pos = (gl_FragCoord.xy*2.1 - resolution.xy) / resolution.y;
@@ -65,4 +65,5 @@ void main( void )
     float c = (total_d)*0.0001;
     vec4 result = vec4( randColor*(1.0-vec3(c, c, c) - vec3(0.025, 0.025, 0.025)*m*0.8), 1.0 );
     outputF = result;
+	outputF.a = blendAlpha;
 }

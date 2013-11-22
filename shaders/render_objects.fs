@@ -300,7 +300,7 @@ vec3 render( in vec3 ro, in vec3 rd )
 }
 
 uniform vec3 randColor;
-
+uniform float blendAlpha;
 void main( void )
 {
 	vec2 q = gl_FragCoord.xy/resolution.xy;
@@ -326,5 +326,5 @@ void main( void )
 
 	col = sqrt( col );
 
-    outputF=vec4( col, 1.0 );
+    outputF=vec4( col, blendAlpha );
 }

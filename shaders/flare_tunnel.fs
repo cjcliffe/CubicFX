@@ -23,6 +23,7 @@ uniform vec2 resolution;
 uniform float vuHigh;
 uniform float vuLow;
 uniform vec3 randColor;
+uniform float blendAlpha;
 
 vec4 colour(float c, float d)
 {
@@ -155,4 +156,5 @@ void main()
 //	outputF += cosmos(t) * d * d * CosmosMix;
 	outputF *= d;
 	outputF *= mod(gl_FragCoord.y, 2.0);
+	outputF.a = blendAlpha;
 }
