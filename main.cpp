@@ -282,6 +282,25 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 			case GLFW_KEY_Z:
 				currentViz = visualizers[29];
 				break;
+			case GLFW_KEY_X:
+				currentViz = visualizers[30];
+				break;
+			case GLFW_KEY_C:
+				currentViz = visualizers[31];
+				break;
+			case GLFW_KEY_V:
+				currentViz = visualizers[32];
+				break;
+			case GLFW_KEY_B:
+				currentViz = visualizers[33];
+				break;
+			case GLFW_KEY_N:
+				currentViz = visualizers[34];
+				break;
+			case GLFW_KEY_M:
+				currentViz = visualizers[35];
+				break;
+
 
 
 			// Alpha setting
@@ -368,10 +387,9 @@ int main(int argc, char * argv[])
     ShaderViz rmTunnel("shaders/vertex_common.vs", "shaders/raymarch_tunnel.fs");
     ShaderViz discoFloor("shaders/vertex_common.vs", "shaders/discofloor_ceiling.fs");
     ShaderViz flareTunnel("shaders/vertex_common.vs", "shaders/flare_tunnel.fs");
-    ShaderViz colorSpiral("shaders/vertex_common.vs","shaders/color_spiral_complex.fs");
+//    ShaderViz colorSpiral("shaders/vertex_common.vs","shaders/color_spiral_complex.fs");
     ShaderViz mandelBlob("shaders/vertex_common.vs","shaders/raymarch_fractal3d.fs");
     ShaderViz lineZoom("shaders/vertex_common.vs","shaders/raymarch_lines_zoom.fs");
-	ShaderViz renderObjs("shaders/vertex_common.vs", "shaders/render_objects.fs");
 	ShaderViz hexField("shaders/vertex_common.vs", "shaders/hex_twist_field.fs");
 	ShaderViz discoBall("shaders/vertex_common.vs", "shaders/discoball.fs");
 	ShaderViz cubeArray("shaders/vertex_common.vs", "shaders/cube_array.fs");
@@ -390,6 +408,14 @@ int main(int argc, char * argv[])
 	ShaderViz spaceShip("shaders/vertex_common.vs", "shaders/spaceship.fs");
 	ShaderViz spaceRings("shaders/vertex_common.vs", "shaders/space_rings.fs");
 	ShaderViz hologram("shaders/vertex_common.vs", "shaders/hologram.fs");
+	ShaderViz musicBall("shaders/vertex_common.vs", "shaders/music_ball.fs");
+	ShaderViz ledSpectrum("shaders/vertex_common.vs", "shaders/led_spectrum.fs");
+	ShaderViz kifs2D("shaders/vertex_common.vs", "shaders/2dkifs.fs");
+	ShaderViz planeDTunEffect("shaders/vertex_common.vs", "shaders/planed_tunnel_effect.fs");
+	ShaderViz noxiousBox("shaders/vertex_common.vs", "shaders/noxious_box.fs");
+	ShaderViz waveFloor("shaders/vertex_common.vs", "shaders/wave_floor.fs");
+	ShaderViz hexField2("shaders/vertex_common.vs", "shaders/hex_field.fs");
+	ShaderViz spaceRace("shaders/vertex_common.vs", "shaders/space_race.fs");
 
 	if (!initAudio()) {
 		return -1;
@@ -415,10 +441,9 @@ int main(int argc, char * argv[])
     visualizers.push_back(&rmTunnel);
     visualizers.push_back(&discoFloor);
     visualizers.push_back(&flareTunnel);
-    visualizers.push_back(&colorSpiral);
+//    visualizers.push_back(&colorSpiral);
     visualizers.push_back(&mandelBlob);
     visualizers.push_back(&lineZoom);
-	visualizers.push_back(&renderObjs);
 	visualizers.push_back(&hexField);
 	visualizers.push_back(&discoBall);
 	visualizers.push_back(&cubeArray);
@@ -437,6 +462,14 @@ int main(int argc, char * argv[])
 	visualizers.push_back(&spaceShip);
 	visualizers.push_back(&spaceRings);
 	visualizers.push_back(&hologram);
+	visualizers.push_back(&musicBall);
+	visualizers.push_back(&ledSpectrum);
+	visualizers.push_back(&kifs2D);
+	visualizers.push_back(&planeDTunEffect);
+	visualizers.push_back(&noxiousBox);
+	visualizers.push_back(&waveFloor);
+	visualizers.push_back(&hexField2);
+	visualizers.push_back(&spaceRace);
 
 	
 //    visualizers.push_back(&torusSwirl);
@@ -444,7 +477,7 @@ int main(int argc, char * argv[])
 //    visualizers.push_back(&cubeMatrix);
 //    visualizers.push_back(&rmBoxFloor);
     
-	currentViz = &hologram;
+	currentViz = &spaceRace;
     
     float frameSlice = 0.0f;
     
@@ -467,8 +500,17 @@ int main(int argc, char * argv[])
 
 			if (alphaVec) {
 				alphaVal += alphaVec*visTimer.lastUpdateSeconds()*0.1;
+				if (alphaVal > 1.0) {
+					alphaVal = 1.0;
+				}
+				if (alphaVal < 0.05) {
+					alphaVal = 0.05;
+				}
+				cout << alphaVal << endl;
 			}
             
+//			alphaVal = 1.0 - vu->vu_levels[0];
+
 			currentViz->setBlendAlpha(alphaVal);
             currentViz->updateVariables(visTimer.getSeconds(),sample_data,vu->vu_levels,contest);
 

@@ -115,7 +115,7 @@ vec4 rayMarch(in vec3 from, in vec3 dir) {
 	vec3 pos;
 	for (int i=0; i < MaxSteps; i++) {
 		// Non-linear perspective applied here.
-		dir.zy = rotate(dir2.zy,totalDistance*cos( (time)/4.0+timerKick)*NonLinearPerspective);
+		dir.zy = rotate(dir2.zy,totalDistance*cos( (time)/4.0+timerKick*0.5)*NonLinearPerspective);
 		
 		pos = from + totalDistance * dir;
 		distance = DE(pos)*FudgeFactor;
@@ -142,7 +142,7 @@ vec4 rayMarch(in vec3 from, in vec3 dir) {
 void main(void)
 {
 	// Camera position (eye), and camera target
-	vec3 camPos = 0.5*(time+timerKick*2.0)*vec3(1.0,0.0,0.0);
+	vec3 camPos = 0.5*(time+timerKick)*vec3(1.0,0.0,0.0);
 	vec3 target = camPos + vec3(1.0,0.4*cos(time),0.4*sin(0.4*time));
 	vec3 camUp  = vec3(0.0,1.0,0.0);
 	

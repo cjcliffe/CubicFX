@@ -6,7 +6,7 @@ uniform float timerKick;
 uniform vec2 resolution;
 uniform float vuData[128];
 uniform vec3 randColor;
-
+uniform float blendAlpha;
 
 vec3 planeVUMatrix(vec2 uv) {
 	float upos = mod(uv.x,1.0)*8.0;
@@ -103,7 +103,7 @@ vec3 floorTex(vec3 ro, vec3 rd)
 	float t = (1.0 - ro.y) / rd.y;
 	float hit = step(t, 0.0);
 	vec2 tc = ro.xz + rd.xz * t;
-	vec3 glow = vec3(0.6, 0.8, 1.0) * 1.0 / length(tc * vec2(0.3, 1.0)) * 0.2 * mix(1.0, flickers(), 0.25);
+	vec3 glow = randColor * 1.0 / length(tc * vec2(0.3, 1.0)) * 0.2 * mix(1.0, flickers(), 0.25);
 	
 	float wires = 1.0;
 	
@@ -124,11 +124,11 @@ vec3 floorTex(vec3 ro, vec3 rd)
 	}
 	
 
-	return mix(vec3(0.0), mix(vec3(0.0), glow * 0.2, wires) +
+	return mix(vec3(0.0), mix(vec3(0.0), glow * 0.5, wires) +
 			   		(1.0 - wires) * vec3(randColor * sqrt(elec) * 0.3 / length(tc)), hit);
 }
 
-uniform float blendAlpha;
+
 
 void main(void)
 {
@@ -138,6 +138,7 @@ void main(void)
 	
 	vec3 ct = vec3(0.0, 0.0, 0.0);
 	vec3 cp = rotateY((time) * 0.5 * 0.5, vec3(0.0, -0.5 + sin((time) * 0.7 * 0.5) * 0.7, 3.9));
+	cp.y += 0.5;
 	vec3 cw = normalize(ct - cp);
 	vec3 cu = normalize(cross(cw, vec3(0.0, 1.0, 0.0)));
 	vec3 cv = normalize(cross(cu, cw));
