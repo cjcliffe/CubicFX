@@ -12,6 +12,7 @@
 #include "cubicvr2/opengl/Material.h"
 #include "cubicvr2/core/Mesh.h"
 #include "cubicvr2/core/Camera.h"
+#include "cubicvr2/opengl/Texture.h";
 
 #include <math.h>
 #include "BeatDetektor.h"
@@ -56,9 +57,12 @@ namespace CubicVR {
 		shaderUniformFloat u_blendAlpha;
 
 		shaderUniformSampler2D u_samplerTex;
+		shaderUniformSampler2D u_overlayImage;
         
 		GLuint samplerTex;
 		GLuint samplerTexSampler;
+
+		Texture *overlayTexture;
 
         vec3 randColor, randColor2;
         int lastBeat;
@@ -70,6 +74,8 @@ namespace CubicVR {
         
         ShaderViz(string vsFn, string fsFn);
         
+		void setOverlayTexture(Texture *oTex);
+
         float floatArrayAverage(float *data, int start, int end);
         float floatArrayAbsAverage(float *data, int start, int end);
 		float floatArrayMax(float *data, int start, int end);
@@ -79,7 +85,8 @@ namespace CubicVR {
 		void setBlendAlpha(float val);
         
         void display();
-        
+		void display2();
+
         
         void init(string vsFn, string fsFn);
     };

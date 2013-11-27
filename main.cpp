@@ -25,6 +25,7 @@
 #endif
 
 #include <cubicvr2/core/Timer.h>
+#include <cubicvr2/opengl/Texture.h>
 
 #include "FFT.h"
 #include "BeatDetektor.h"
@@ -174,9 +175,39 @@ void processBD() {
     
 }
 
+
 Timer fpsTimer;
 ShaderViz *currentViz;
 vector<ShaderViz *> visualizers;
+vector<Texture *> overlays;
+
+
+static void loadOverlays() {
+	Texture *tex;
+
+	tex = new Texture();
+	tex->loadPNG("png/OFFSET.png");
+	overlays.push_back(tex);
+
+	tex = new Texture();
+	tex->loadPNG("png/JACK.png");
+	overlays.push_back(tex);
+
+	tex = new Texture();
+	tex->loadPNG("png/synthamesk.png");
+	overlays.push_back(tex);
+
+	tex = new Texture();
+	tex->loadPNG("png/C64.png");
+	overlays.push_back(tex);
+
+	tex = new Texture();
+	tex->loadPNG("png/LAFO.png");
+	overlays.push_back(tex);
+}
+
+ShaderViz *overlayImage;
+bool overlayEnabled = false;
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -188,37 +219,65 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
     
     
     if (action == GLFW_PRESS) {
-        
-        switch (key) {
-            case GLFW_KEY_1:
-                currentViz = visualizers[0];
+
+		if (mods&GLFW_MOD_SHIFT) {
+			switch (key) {
+			case GLFW_KEY_1:
+				overlayImage->setOverlayTexture(overlays[0]);
+				overlayEnabled = true;
 				break;
-            case GLFW_KEY_2:
-                currentViz = visualizers[1];
-                break;
-            case GLFW_KEY_3:
-                currentViz = visualizers[2];
-                break;
-            case GLFW_KEY_4:
-                currentViz = visualizers[3];
-                break;
-            case GLFW_KEY_5:
-                currentViz = visualizers[4];
+			case GLFW_KEY_2:
+				overlayImage->setOverlayTexture(overlays[1]);
+				overlayEnabled = true;
 				break;
-            case GLFW_KEY_6:
-                currentViz = visualizers[5];
+			case GLFW_KEY_3:
+				overlayImage->setOverlayTexture(overlays[2]);
+				overlayEnabled = true;
 				break;
-            case GLFW_KEY_7:
-                currentViz = visualizers[6];
-                break;
-            case GLFW_KEY_8:
-                currentViz = visualizers[7];
+			case GLFW_KEY_4:
+				overlayImage->setOverlayTexture(overlays[3]);
+				overlayEnabled = true;
 				break;
-            case GLFW_KEY_9:
-                currentViz = visualizers[8];
+			case GLFW_KEY_5:
+				overlayImage->setOverlayTexture(overlays[4]);
+				overlayEnabled = true;
 				break;
-            case GLFW_KEY_0:
-                currentViz = visualizers[9];
+			case GLFW_KEY_0:
+				overlayEnabled = !overlayEnabled;
+				break;
+			}
+		} else {
+
+			switch (key) {
+			case GLFW_KEY_1:
+				currentViz = visualizers[0];
+				break;
+			case GLFW_KEY_2:
+				currentViz = visualizers[1];
+				break;
+			case GLFW_KEY_3:
+				currentViz = visualizers[2];
+				break;
+			case GLFW_KEY_4:
+				currentViz = visualizers[3];
+				break;
+			case GLFW_KEY_5:
+				currentViz = visualizers[4];
+				break;
+			case GLFW_KEY_6:
+				currentViz = visualizers[5];
+				break;
+			case GLFW_KEY_7:
+				currentViz = visualizers[6];
+				break;
+			case GLFW_KEY_8:
+				currentViz = visualizers[7];
+				break;
+			case GLFW_KEY_9:
+				currentViz = visualizers[8];
+				break;
+			case GLFW_KEY_0:
+				currentViz = visualizers[9];
 				break;
 
 			case GLFW_KEY_Q:
@@ -300,9 +359,10 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 			case GLFW_KEY_M:
 				currentViz = visualizers[35];
 				break;
+			}
+		}
 
-
-
+		switch (key) {
 			// Alpha setting
 			case GLFW_KEY_PAGE_DOWN:
 				alphaVec = (mods&GLFW_MOD_SHIFT)?4.0 : 1.0;
@@ -417,6 +477,10 @@ int main(int argc, char * argv[])
 	ShaderViz hexField2("shaders/vertex_common.vs", "shaders/hex_field.fs");
 	ShaderViz spaceRace("shaders/vertex_common.vs", "shaders/space_race.fs");
 
+	overlayImage = new ShaderViz("shaders/vertex_common.vs", "shaders/overlay_image.fs");
+
+	loadOverlays();
+
 	if (!initAudio()) {
 		return -1;
 	}
@@ -518,7 +582,12 @@ int main(int argc, char * argv[])
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
             currentViz->display();
-            
+
+			if (overlayEnabled) {
+				overlayImage->updateVariables(visTimer.getSeconds(), sample_data, vu->vu_levels, contest);
+				overlayImage->display2();
+			}
+
             glfwSwapBuffers(window);
             frameSlice = 0.0f;
         }

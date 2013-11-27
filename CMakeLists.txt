@@ -69,7 +69,7 @@ SET (shaderfx_headers
 )
 
 configure_files(${PROJECT_SOURCE_DIR}/shaders ${PROJECT_BINARY_DIR}/shaders COPYONLY)
-configure_files(${PROJECT_SOURCE_DIR}/shaders ${PROJECT_BINARY_DIR}/shaders COPYONLY)
+configure_files(${PROJECT_SOURCE_DIR}/png ${PROJECT_BINARY_DIR}/png COPYONLY)
 
 
 add_executable(ShaderFX ${shaderfx_sources} ${shaderfx_headers})

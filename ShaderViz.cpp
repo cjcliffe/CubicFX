@@ -14,6 +14,11 @@ ShaderViz::ShaderViz(string vsFn, string fsFn) {
 	timerMid = 0.0f;
 	timerHigh = 0.0f;
     lastTime = 0.0f;
+	overlayTexture = NULL;
+}
+
+void ShaderViz::setOverlayTexture(Texture *oTex) {
+	overlayTexture = oTex;
 }
 
 float ShaderViz::floatArrayAverage(float *data, int start, int end) {
@@ -52,7 +57,9 @@ void ShaderViz::setBlendAlpha(float val) {
 
 
 void ShaderViz::updateVariables(float time_value, vector<float> &sample_data, vector<float> &vu_data, BeatDetektorContest *contest) {
-    
+	
+	vizShader.use();
+
     a_vertexPosition.set(fsQuadMesh.getVBO()->gl_points);
     a_vertexPosition.update();
     
@@ -184,6 +191,12 @@ void ShaderViz::updateVariables(float time_value, vector<float> &sample_data, ve
 	if (u_blendAlpha.size) {
 		u_blendAlpha.update();
 	}
+
+	if (u_overlayImage.size && overlayTexture != NULL) {
+		u_overlayImage.set(0);
+		u_overlayImage.update();
+		overlayTexture->bind(0);
+	}
 }
 
 
@@ -197,6 +210,17 @@ void ShaderViz::display()
     
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,fsQuadMesh.getVBO()->gl_elements);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, NULL);
+}
+
+
+void ShaderViz::display2()
+{
+	glClear(GL_DEPTH_BUFFER_BIT); //GL_COLOR_BUFFER_BIT | 
+
+	vizShader.use();
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, fsQuadMesh.getVBO()->gl_elements);
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, NULL);
 }
 
 
@@ -248,6 +272,8 @@ void ShaderViz::init(string vsFn, string fsFn) {
     u_sampleRange = shaderVars.getUniform("sampleRange");
     
 	u_blendAlpha = shaderVars.getUniform("blendAlpha");
+
+	u_overlayImage = shaderVars.getUniform("overlayImage");
 
 	glGenTextures(1, &samplerTex);
 	glBindTexture(GL_TEXTURE_1D, samplerTex);
