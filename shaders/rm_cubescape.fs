@@ -74,7 +74,7 @@ vec3 map( in vec3 pos )
 	f = pow( clamp( f*0.75, 0.0, 1.0 ), 2.0 );
 	#endif 
 	*/
-	f = vuData[int(mod(id*100.0,64))];
+	f = vuData[int(mod(id*100.0,64))]/2.0;
     float h = 0.01 + 4.0*f;
 	float dis = dbox( vec3(fpos.x-0.5,pos.y-0.5*h,fpos.y-0.5), vec3(0.3,h*0.5,0.3), 0.1 );
 

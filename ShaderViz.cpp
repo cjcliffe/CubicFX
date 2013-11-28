@@ -8,6 +8,10 @@
 
 using namespace CubicVR;
 
+int VIZ_WIDTH = 1280;
+int VIZ_HEIGHT = 720;
+
+
 ShaderViz::ShaderViz(string vsFn, string fsFn) {
     init(vsFn,fsFn);
     timerKick = 0.0f;

@@ -7,6 +7,7 @@
 //
 
 #include <iostream>
+#include <time.h>
 
 #include "ShaderViz.h"
 #ifdef _WIN32
@@ -48,6 +49,8 @@ using namespace CubicVR;
 Timer visTimer;
 bool bpm_latch = false;
 
+BeatDetektor *det_low;
+BeatDetektor *det_high;
 BeatDetektor *det;
 BeatDetektorVU *vu;
 BeatDetektorContest *contest;
@@ -136,7 +139,10 @@ static void captureAudio(void) {
 
 void initBD () {
 
-    det = new BeatDetektor(85,150);
+    det_low = new BeatDetektor(90,160);
+	det_high = new BeatDetektor(140, 260);
+
+	det = det_low;
 //		det->detection_rate = 20.0;
 //		det->quality_reward = 20.0;
 	
@@ -162,10 +168,11 @@ void processBD() {
 		fft_collapse.push_back(fft_data[x]);
 	}
     
-    det->process(timer_seconds,fft_collapse);
-    contest->process(timer_seconds,det);
+    det_low->process(timer_seconds,fft_collapse);
+	det_high->process(timer_seconds, fft_collapse);
+	contest->process(timer_seconds, det);
     
-	det->process(timer_seconds,fft_collapse);
+	//det->process(timer_seconds,fft_collapse);
 
 	if (contest->win_bpm_int)
         vu->process(det,visTimer.lastUpdateSeconds(),((float)contest->win_bpm_int/10.0));
@@ -177,7 +184,7 @@ void processBD() {
 
 
 Timer fpsTimer;
-ShaderViz *currentViz;
+ShaderViz *currentViz=NULL;
 vector<ShaderViz *> visualizers;
 vector<Texture *> overlays;
 
@@ -204,10 +211,43 @@ static void loadOverlays() {
 	tex = new Texture();
 	tex->loadPNG("png/LAFO.png");
 	overlays.push_back(tex);
+
+	tex = new Texture();
+	tex->loadPNG("png/LAFOLOGO.png");
+	overlays.push_back(tex);
+
 }
 
 ShaderViz *overlayImage;
+ShaderViz *targetViz = NULL;
+float transition_timer = 0.0;
+int transition = 0;
+bool in_transition = false;
+
+int lastImage = -1;
+int thisImage = 0;
+float overlayAlpha = 0.0f;
+float overlayDelta = 0.0f;
 bool overlayEnabled = false;
+float autoTimer = 0;
+float autoTimerLimit = 30;
+bool manualOverride = false;
+
+
+
+
+
+void vizRandom() {
+	int nextViz = (int)floor(((float)rand() / (float)RAND_MAX)*visualizers.size());
+	if (nextViz > visualizers.size() - 1) nextViz = visualizers.size() - 1;
+	targetViz = visualizers[nextViz];
+	if (currentViz == NULL) {
+		currentViz = targetViz;
+	}
+}
+
+
+
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -219,146 +259,188 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
     
     
     if (action == GLFW_PRESS) {
-
+		bool doChange = false;
 		if (mods&GLFW_MOD_SHIFT) {
+			thisImage = -1;
 			switch (key) {
 			case GLFW_KEY_1:
 				overlayImage->setOverlayTexture(overlays[0]);
-				overlayEnabled = true;
+				thisImage = 0;
+				doChange = true;
 				break;
 			case GLFW_KEY_2:
 				overlayImage->setOverlayTexture(overlays[1]);
-				overlayEnabled = true;
+				thisImage = 1;
+				doChange = true;
 				break;
 			case GLFW_KEY_3:
 				overlayImage->setOverlayTexture(overlays[2]);
-				overlayEnabled = true;
+				thisImage = 2;
+				doChange = true;
 				break;
 			case GLFW_KEY_4:
 				overlayImage->setOverlayTexture(overlays[3]);
-				overlayEnabled = true;
+				thisImage = 3;
+				doChange = true;
 				break;
 			case GLFW_KEY_5:
 				overlayImage->setOverlayTexture(overlays[4]);
-				overlayEnabled = true;
+				thisImage = 4;
+				doChange = true;
+				break;
+			case GLFW_KEY_6:
+				overlayImage->setOverlayTexture(overlays[5]);
+				thisImage = 5;
+				doChange = true;
 				break;
 			case GLFW_KEY_0:
 				overlayEnabled = !overlayEnabled;
+				overlayDelta = 0;
 				break;
 			}
-		} else {
 
+			if (doChange && thisImage == lastImage) {
+				overlayDelta = overlayDelta ? -overlayDelta : -1.0;
+			}
+
+			if (doChange && !overlayEnabled) {
+				overlayEnabled = true;
+				overlayDelta = -1.0;
+			}
+
+			if (thisImage != -1) lastImage = thisImage;
+
+		} else {
+			ShaderViz *tempViz = targetViz;
 			switch (key) {
 			case GLFW_KEY_1:
-				currentViz = visualizers[0];
+				targetViz = visualizers[0];
 				break;
 			case GLFW_KEY_2:
-				currentViz = visualizers[1];
+				targetViz = visualizers[1];
 				break;
 			case GLFW_KEY_3:
-				currentViz = visualizers[2];
+				targetViz = visualizers[2];
 				break;
 			case GLFW_KEY_4:
-				currentViz = visualizers[3];
+				targetViz = visualizers[3];
 				break;
 			case GLFW_KEY_5:
-				currentViz = visualizers[4];
+				targetViz = visualizers[4];
 				break;
 			case GLFW_KEY_6:
-				currentViz = visualizers[5];
+				targetViz = visualizers[5];
 				break;
 			case GLFW_KEY_7:
-				currentViz = visualizers[6];
+				targetViz = visualizers[6];
 				break;
 			case GLFW_KEY_8:
-				currentViz = visualizers[7];
+				targetViz = visualizers[7];
 				break;
 			case GLFW_KEY_9:
-				currentViz = visualizers[8];
+				targetViz = visualizers[8];
 				break;
 			case GLFW_KEY_0:
-				currentViz = visualizers[9];
+				targetViz = visualizers[9];
 				break;
 
 			case GLFW_KEY_Q:
-				currentViz = visualizers[10];
+				targetViz = visualizers[10];
 				break;
 			case GLFW_KEY_W:
-				currentViz = visualizers[11];
+				targetViz = visualizers[11];
 				break;
 			case GLFW_KEY_E:
-				currentViz = visualizers[12];
+				targetViz = visualizers[12];
 				break;
 			case GLFW_KEY_R:
-				currentViz = visualizers[13];
+				targetViz = visualizers[13];
 				break;
 			case GLFW_KEY_T:
-				currentViz = visualizers[14];
+				targetViz = visualizers[14];
 				break;
 			case GLFW_KEY_Y:
-				currentViz = visualizers[15];
+				targetViz = visualizers[15];
 				break;
 			case GLFW_KEY_U:
-				currentViz = visualizers[16];
+				targetViz = visualizers[16];
 				break;
 			case GLFW_KEY_I:
-				currentViz = visualizers[17];
+				targetViz = visualizers[17];
 				break;
 			case GLFW_KEY_O:
-				currentViz = visualizers[18];
+				targetViz = visualizers[18];
 				break;
 			case GLFW_KEY_P:
-				currentViz = visualizers[19];
+				targetViz = visualizers[19];
 				break;
 
 			case GLFW_KEY_A:
-				currentViz = visualizers[20];
+				targetViz = visualizers[20];
 				break;
 			case GLFW_KEY_S:
-				currentViz = visualizers[21];
+				targetViz = visualizers[21];
 				break;
 			case GLFW_KEY_D:
-				currentViz = visualizers[22];
+				targetViz = visualizers[22];
 				break;
 			case GLFW_KEY_F:
-				currentViz = visualizers[23];
+				targetViz = visualizers[23];
 				break;
 			case GLFW_KEY_G:
-				currentViz = visualizers[24];
+				targetViz = visualizers[24];
 				break;
 			case GLFW_KEY_H:
-				currentViz = visualizers[25];
+				targetViz = visualizers[25];
 				break;
 			case GLFW_KEY_J:
-				currentViz = visualizers[26];
+				targetViz = visualizers[26];
 				break;
 			case GLFW_KEY_K:
-				currentViz = visualizers[27];
+				targetViz = visualizers[27];
 				break;
 			case GLFW_KEY_L:
-				currentViz = visualizers[28];
+				targetViz = visualizers[28];
 				break;
 			case GLFW_KEY_Z:
-				currentViz = visualizers[29];
+				targetViz = visualizers[29];
 				break;
 			case GLFW_KEY_X:
-				currentViz = visualizers[30];
+				targetViz = visualizers[30];
 				break;
 			case GLFW_KEY_C:
-				currentViz = visualizers[31];
+				targetViz = visualizers[31];
 				break;
 			case GLFW_KEY_V:
-				currentViz = visualizers[32];
+				targetViz = visualizers[32];
 				break;
 			case GLFW_KEY_B:
-				currentViz = visualizers[33];
+				targetViz = visualizers[33];
 				break;
 			case GLFW_KEY_N:
-				currentViz = visualizers[34];
+				targetViz = visualizers[34];
 				break;
 			case GLFW_KEY_M:
-				currentViz = visualizers[35];
+				targetViz = visualizers[35];
 				break;
+			case GLFW_KEY_SPACE:
+				vizRandom();
+				manualOverride = false;
+				autoTimer = 0;
+				break;
+			case GLFW_KEY_MINUS:
+				cout << "Low mode" << endl;
+				det = det_low;
+				break;
+			case GLFW_KEY_EQUAL:
+				cout << "High mode" << endl;
+				det = det_high;
+				break;
+
+			}
+
+			if (key != GLFW_KEY_SPACE && targetViz != tempViz) {
+				manualOverride = true;
 			}
 		}
 
@@ -389,9 +471,26 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 	}
 }
 
-
 int main(int argc, char * argv[])
 {
+
+	int doFullscreen;
+	int ovrWidth = 0;
+	int ovrHeight = 0;
+	int monitorNum = 0;
+
+	if (argc > 1) {
+		if (argc >= 2) {
+			sscanf(argv[1], "%d", &monitorNum);
+		}
+		if (argc >= 4) {
+			sscanf(argv[2], "%d", &ovrWidth);
+			sscanf(argv[3], "%d", &ovrHeight);
+		}
+		if (argc >= 5) {
+			sscanf(argv[4], "%f", &autoTimerLimit);
+		}
+	}
 
     if (!glfwInit()) {
         return -1;
@@ -405,8 +504,19 @@ int main(int argc, char * argv[])
 	GLFWmonitor **monitors;
 	int numMonitors;
 	monitors = glfwGetMonitors(&numMonitors);
+	GLFWwindow *window;
 
-    GLFWwindow *window = glfwCreateWindow(VIZ_WIDTH, VIZ_HEIGHT, "BeatDetektor ShaderFX", NULL, NULL);
+	if (ovrWidth && ovrHeight) {
+		VIZ_WIDTH = ovrWidth;
+		VIZ_HEIGHT = ovrHeight;
+	}
+
+	if (monitorNum > 0 && monitorNum <= numMonitors) {
+		window = glfwCreateWindow(VIZ_WIDTH, VIZ_HEIGHT, "BeatDetektor ShaderFX", monitors[monitorNum-1], NULL);
+	}
+	else {
+		window = glfwCreateWindow(VIZ_WIDTH, VIZ_HEIGHT, "BeatDetektor ShaderFX", NULL, NULL);
+	}
     //GLFWwindow *window = glfwCreateWindow(VIZ_WIDTH, VIZ_HEIGHT, "BeatDetektor ShaderFX", glfwGetPrimaryMonitor(), NULL);
 //	GLFWwindow *window = glfwCreateWindow(VIZ_WIDTH, VIZ_HEIGHT, "BeatDetektor ShaderFX", monitors[1], NULL);
 
@@ -541,7 +651,9 @@ int main(int argc, char * argv[])
 //    visualizers.push_back(&cubeMatrix);
 //    visualizers.push_back(&rmBoxFloor);
     
-	currentViz = &spaceRace;
+	//currentViz = &spaceRace;
+	srand(time(NULL));
+	vizRandom();
     
     float frameSlice = 0.0f;
     
@@ -572,24 +684,88 @@ int main(int argc, char * argv[])
 				}
 				cout << alphaVal << endl;
 			}
-            
+
+
 //			alphaVal = 1.0 - vu->vu_levels[0];
 
-			currentViz->setBlendAlpha(alphaVal);
-            currentViz->updateVariables(visTimer.getSeconds(),sample_data,vu->vu_levels,contest);
 
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-            currentViz->display();
 
-			if (overlayEnabled) {
+			if (currentViz != targetViz) {
+				in_transition = true;
+				transition_timer += visTimer.lastUpdateSeconds();
+				if (transition_timer > 1.0) {
+					in_transition = false;
+					transition_timer = 0;
+					currentViz = targetViz;
+				}
+			}
+
+
+			if (in_transition) {
+				currentViz->updateVariables(visTimer.getSeconds(), sample_data, vu->vu_levels, contest);
+				currentViz->setBlendAlpha(1.0-transition_timer);
+				currentViz->display();
+
+				targetViz->updateVariables(visTimer.getSeconds(), sample_data, vu->vu_levels, contest);
+				targetViz->setBlendAlpha(transition_timer);
+				targetViz->display();
+			}
+			else {
+				currentViz->updateVariables(visTimer.getSeconds(), sample_data, vu->vu_levels, contest);
+				currentViz->setBlendAlpha(alphaVal);
+				currentViz->display();
+			}
+            
+
+
+
+
+			if (overlayDelta) {
+				if (overlayEnabled) {
+					overlayAlpha += overlayDelta * visTimer.lastUpdateSeconds();
+				}
+				
+				if (overlayAlpha < -1.0) {
+					overlayAlpha = -1.0;
+				}
+				else if (overlayAlpha > 1.0) {
+					overlayAlpha = 1.0;
+				}
+				
+			}
+			else if (overlayAlpha) {
+				overlayAlpha -= overlayAlpha * visTimer.lastUpdateSeconds();
+				if (fabs(overlayAlpha) < 0.01) {
+					overlayAlpha = 0.0;
+				}
+			}
+
+			if (overlayEnabled || overlayAlpha != 0.0) {
+				overlayImage->setBlendAlpha(overlayAlpha);
 				overlayImage->updateVariables(visTimer.getSeconds(), sample_data, vu->vu_levels, contest);
 				overlayImage->display2();
 			}
 
             glfwSwapBuffers(window);
             frameSlice = 0.0f;
+
+			if (!in_transition) autoTimer += visTimer.lastUpdateSeconds();
+			if (autoTimer > autoTimerLimit && !manualOverride) {
+				autoTimer = 0;
+				vizRandom();
+			}
+
+			if (!manualOverride) {
+				alphaVal = 1.0+ (sin(visTimer.getSeconds()*0.115+50.0) + cos(visTimer.getSeconds()*0.120+200.0) - sin(100.0+visTimer.getSeconds()*0.132))/2.0;
+				if (alphaVal < 0.20) {
+					alphaVal = 0.20;
+				}
+				//cout << alphaVal << endl;
+			}
+
         }
         
         glfwPollEvents();
