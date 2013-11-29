@@ -9,7 +9,7 @@
 using namespace CubicVR;
 
 int VIZ_WIDTH = 1280;
-int VIZ_HEIGHT = 720;
+int VIZ_HEIGHT = 768;
 
 
 ShaderViz::ShaderViz(string vsFn, string fsFn) {
@@ -206,28 +206,11 @@ void ShaderViz::updateVariables(float time_value, vector<float> &sample_data, ve
 
 void ShaderViz::display()
 {
-    glClearColor(0.3f,0.3f,0.3f,1.0f);
-    glClear(GL_DEPTH_BUFFER_BIT); //GL_COLOR_BUFFER_BIT | 
-    glViewport(0, 0, VIZ_WIDTH, VIZ_HEIGHT);
-
     vizShader.use();
     
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,fsQuadMesh.getVBO()->gl_elements);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, NULL);
 }
-
-
-void ShaderViz::display2()
-{
-	glClear(GL_DEPTH_BUFFER_BIT); //GL_COLOR_BUFFER_BIT | 
-
-	vizShader.use();
-
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, fsQuadMesh.getVBO()->gl_elements);
-	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, NULL);
-}
-
-
 
 
 void ShaderViz::init(string vsFn, string fsFn) {

@@ -85,7 +85,6 @@ namespace CubicVR {
 		void setBlendAlpha(float val);
         
         void display();
-		void display2();
 
         
         void init(string vsFn, string fsFn);

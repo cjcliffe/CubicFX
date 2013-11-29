@@ -220,9 +220,22 @@ static void loadOverlays() {
 
 ShaderViz *overlayImage;
 ShaderViz *targetViz = NULL;
+
 float transition_timer = 0.0;
 int transition = 0;
 bool in_transition = false;
+
+enum transitionType {
+	TRANS_CROSSFADE,
+	TRANS_WIPERIGHT,
+	TRANS_WIPELEFT,
+	TRANS_WIPEDOWN,
+	TRANS_WIPEUP,
+	TRANS_ZOOMIN,
+	TRANS_MAX
+};
+transitionType trans_type;
+
 
 int lastImage = -1;
 int thisImage = 0;
@@ -244,6 +257,10 @@ void vizRandom() {
 	if (currentViz == NULL) {
 		currentViz = targetViz;
 	}
+}
+
+void transRandom() {
+	trans_type = (transitionType)(int)floor(((float)rand() / (float)RAND_MAX)*TRANS_MAX);
 }
 
 
@@ -425,6 +442,7 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 				break;
 			case GLFW_KEY_SPACE:
 				vizRandom();
+				transRandom();
 				manualOverride = false;
 				autoTimer = 0;
 				break;
@@ -441,15 +459,18 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 
 			if (key != GLFW_KEY_SPACE && targetViz != tempViz) {
 				manualOverride = true;
+				transRandom();
 			}
 		}
 
 		switch (key) {
 			// Alpha setting
 			case GLFW_KEY_PAGE_DOWN:
+			case GLFW_KEY_COMMA:
 				alphaVec = (mods&GLFW_MOD_SHIFT)?4.0 : 1.0;
 				break;
 			case GLFW_KEY_PAGE_UP:
+			case GLFW_KEY_PERIOD:
 				alphaVec = (mods&GLFW_MOD_SHIFT) ? -4.0 : -1.0;
 				break;
 		}
@@ -458,11 +479,13 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 	if (action == GLFW_RELEASE) {
 		switch (key) {
 			case GLFW_KEY_PAGE_DOWN:
+			case GLFW_KEY_COMMA:
 				if (alphaVec > 0.0) {
 					alphaVec = 0.0;
 				}
 				break;
 			case GLFW_KEY_PAGE_UP:
+			case GLFW_KEY_PERIOD:
 				if (alphaVec < 0.0) {
 					alphaVec = 0.0;
 				}
@@ -471,6 +494,8 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 	}
 }
 
+
+
 int main(int argc, char * argv[])
 {
 
@@ -478,6 +503,7 @@ int main(int argc, char * argv[])
 	int ovrWidth = 0;
 	int ovrHeight = 0;
 	int monitorNum = 0;
+
 
 	if (argc > 1) {
 		if (argc >= 2) {
@@ -654,6 +680,7 @@ int main(int argc, char * argv[])
 	//currentViz = &spaceRace;
 	srand(time(NULL));
 	vizRandom();
+	transRandom();
     
     float frameSlice = 0.0f;
     
@@ -704,13 +731,70 @@ int main(int argc, char * argv[])
 			}
 
 
+			glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
+			glClear(GL_DEPTH_BUFFER_BIT);
+
+			switch (trans_type) {
+			case TRANS_WIPERIGHT:
+				glViewport((transition_timer*VIZ_WIDTH), 0, VIZ_WIDTH, VIZ_HEIGHT);
+				break;
+			case TRANS_WIPELEFT:
+				glViewport(-(transition_timer*VIZ_WIDTH), 0, VIZ_WIDTH, VIZ_HEIGHT);
+				break;
+			case TRANS_WIPEUP:
+				glViewport(0, -(transition_timer*VIZ_HEIGHT), VIZ_WIDTH, VIZ_HEIGHT);
+				break;
+			case TRANS_WIPEDOWN:
+				glViewport(0, (transition_timer*VIZ_HEIGHT), VIZ_WIDTH, VIZ_HEIGHT);
+				break;
+			default:
+				glViewport(0, 0, VIZ_WIDTH, VIZ_HEIGHT);
+			}
+			
+
 			if (in_transition) {
 				currentViz->updateVariables(visTimer.getSeconds(), sample_data, vu->vu_levels, contest);
-				currentViz->setBlendAlpha(1.0-transition_timer);
+
+//				if (trans_type == TRANS_CROSSFADE) {
+				currentViz->setBlendAlpha((1.0 - transition_timer)*alphaVal);
+//				}
+//				else {
+//					currentViz->setBlendAlpha(alphaVal);
+//				}
+
 				currentViz->display();
 
+				glClear(GL_DEPTH_BUFFER_BIT);
+
+				switch (trans_type) {
+				case TRANS_WIPERIGHT:
+					glViewport(-VIZ_WIDTH + (transition_timer*VIZ_WIDTH), 0, VIZ_WIDTH, VIZ_HEIGHT);
+					break;
+				case TRANS_WIPELEFT:
+					glViewport(VIZ_WIDTH - (transition_timer*VIZ_WIDTH), 0, VIZ_WIDTH, VIZ_HEIGHT);
+					break;
+				case TRANS_WIPEUP:
+					glViewport(0, VIZ_HEIGHT - (transition_timer*VIZ_HEIGHT), VIZ_WIDTH, VIZ_HEIGHT);
+					break;
+				case TRANS_WIPEDOWN:
+					glViewport(0, -VIZ_HEIGHT + (transition_timer*VIZ_HEIGHT), VIZ_WIDTH, VIZ_HEIGHT);
+					break;
+				case TRANS_ZOOMIN:
+					glViewport(VIZ_WIDTH / 2 - (transition_timer*VIZ_WIDTH) / 2, VIZ_HEIGHT / 2 - (transition_timer*VIZ_HEIGHT) / 2, transition_timer*VIZ_WIDTH, transition_timer*VIZ_HEIGHT);
+					break;
+				default:
+					glViewport(0, 0, VIZ_WIDTH, VIZ_HEIGHT);
+				}
+
 				targetViz->updateVariables(visTimer.getSeconds(), sample_data, vu->vu_levels, contest);
-				targetViz->setBlendAlpha(transition_timer);
+
+//				if (trans_type == TRANS_CROSSFADE) {
+				targetViz->setBlendAlpha(alphaVal*transition_timer);
+//				}
+//				else {
+//					targetViz->setBlendAlpha(alphaVal);
+//				}
+
 				targetViz->display();
 			}
 			else {
@@ -746,7 +830,11 @@ int main(int argc, char * argv[])
 			if (overlayEnabled || overlayAlpha != 0.0) {
 				overlayImage->setBlendAlpha(overlayAlpha);
 				overlayImage->updateVariables(visTimer.getSeconds(), sample_data, vu->vu_levels, contest);
-				overlayImage->display2();
+
+				glViewport(0, 0, VIZ_WIDTH, VIZ_HEIGHT);
+				glClear(GL_DEPTH_BUFFER_BIT);
+
+				overlayImage->display();
 			}
 
             glfwSwapBuffers(window);
