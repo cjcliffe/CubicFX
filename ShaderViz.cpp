@@ -19,11 +19,27 @@ ShaderViz::ShaderViz(string vsFn, string fsFn) {
 	timerHigh = 0.0f;
     lastTime = 0.0f;
 	overlayTexture = NULL;
+	tex0Texture = NULL;
+	tex1Texture = NULL;
+	tex2Texture = NULL;
 }
 
 void ShaderViz::setOverlayTexture(Texture *oTex) {
 	overlayTexture = oTex;
 }
+
+void ShaderViz::setTex0Texture(Texture *tex) {
+	tex0Texture = tex;
+}
+
+void ShaderViz::setTex1Texture(Texture *tex) {
+	tex1Texture = tex;
+}
+
+void ShaderViz::setTex2Texture(Texture *tex) {
+	tex2Texture = tex;
+}
+
 
 float ShaderViz::floatArrayAverage(float *data, int start, int end) {
     float accum = 0;
@@ -192,6 +208,7 @@ void ShaderViz::updateVariables(float time_value, vector<float> &sample_data, ve
 //		cout << samplerTexVal[1023] << endl;
 	}
 
+
 	if (u_blendAlpha.size) {
 		u_blendAlpha.update();
 	}
@@ -200,6 +217,22 @@ void ShaderViz::updateVariables(float time_value, vector<float> &sample_data, ve
 		u_overlayImage.set(0);
 		u_overlayImage.update();
 		overlayTexture->bind(0);
+	}
+
+	if (u_tex0.size && tex0Texture != NULL) {
+		u_tex0.set(0);
+		u_tex0.update();
+		tex0Texture->bind(0);
+	}
+	if (u_tex1.size && tex1Texture != NULL) {
+		u_tex1.set(1);
+		u_tex1.update();
+		tex1Texture->bind(1);
+	}
+	if (u_tex2.size && tex2Texture != NULL) {
+		u_tex2.set(2);
+		u_tex2.update();
+		tex2Texture->bind(2);
 	}
 }
 
@@ -270,6 +303,12 @@ void ShaderViz::init(string vsFn, string fsFn) {
 	glSamplerParameteri(samplerTexSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 	u_samplerTex = shaderVars.getUniform("samplerTex");
+
+
+	u_tex0 = shaderVars.getUniform("tex0");
+	u_tex1 = shaderVars.getUniform("tex1");
+	u_tex2 = shaderVars.getUniform("tex2");
+
 
 
 

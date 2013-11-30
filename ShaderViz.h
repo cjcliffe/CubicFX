@@ -58,11 +58,16 @@ namespace CubicVR {
 
 		shaderUniformSampler2D u_samplerTex;
 		shaderUniformSampler2D u_overlayImage;
+
+		shaderUniformSampler2D u_tex0, u_tex1, u_tex2;
         
 		GLuint samplerTex;
 		GLuint samplerTexSampler;
 
 		Texture *overlayTexture;
+		Texture *tex0Texture;
+		Texture *tex1Texture;
+		Texture *tex2Texture;
 
         vec3 randColor, randColor2;
         int lastBeat;
@@ -75,6 +80,9 @@ namespace CubicVR {
         ShaderViz(string vsFn, string fsFn);
         
 		void setOverlayTexture(Texture *oTex);
+		void setTex0Texture(Texture *tex);
+		void setTex1Texture(Texture *tex);
+		void setTex2Texture(Texture *tex);
 
         float floatArrayAverage(float *data, int start, int end);
         float floatArrayAbsAverage(float *data, int start, int end);

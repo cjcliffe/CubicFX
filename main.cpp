@@ -440,17 +440,35 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 			case GLFW_KEY_M:
 				targetViz = visualizers[35];
 				break;
+			case GLFW_KEY_LEFT_BRACKET:
+				targetViz = visualizers[36];
+				break;
+			case GLFW_KEY_RIGHT_BRACKET:
+				targetViz = visualizers[37];
+				break;
+			case GLFW_KEY_SEMICOLON:
+				targetViz = visualizers[38];
+				break;
+			case GLFW_KEY_APOSTROPHE:
+				targetViz = visualizers[39];
+				break;
+			case GLFW_KEY_MINUS:
+				targetViz = visualizers[40];
+				break;
+			case GLFW_KEY_EQUAL:
+				targetViz = visualizers[41];
+				break;
 			case GLFW_KEY_SPACE:
 				vizRandom();
 				transRandom();
 				manualOverride = false;
 				autoTimer = 0;
 				break;
-			case GLFW_KEY_MINUS:
+			case GLFW_KEY_DOWN:
 				cout << "Low mode" << endl;
 				det = det_low;
 				break;
-			case GLFW_KEY_EQUAL:
+			case GLFW_KEY_UP:
 				cout << "High mode" << endl;
 				det = det_high;
 				break;
@@ -613,6 +631,37 @@ int main(int argc, char * argv[])
 	ShaderViz hexField2("shaders/vertex_common.vs", "shaders/hex_field.fs");
 	ShaderViz spaceRace("shaders/vertex_common.vs", "shaders/space_race.fs");
 
+	Texture *tex_noise = new Texture(); 
+	tex_noise->loadPNG("png/tex_noise1.png");
+	Texture *tex_noise2 = new Texture();
+	tex_noise2->loadPNG("png/tex_noise2.png");
+	Texture *tex_tex06 = new Texture();
+	tex_tex06->loadPNG("png/tex_tex06.png");
+	Texture *tex_tex07 = new Texture();
+	tex_tex07->loadPNG("png/tex_tex07.png");
+
+
+
+	ShaderViz truchetTentacles("shaders/vertex_common.vs", "shaders/truchet_tentacles.fs");
+	ShaderViz circlePattern("shaders/vertex_common.vs", "shaders/circle_pattern.fs");
+	circlePattern.setTex0Texture(tex_noise);
+
+	ShaderViz fireShader("shaders/vertex_common.vs", "shaders/fire.fs");
+	ShaderViz dubstepMyAss("shaders/vertex_common.vs", "shaders/dubstepmyass.fs");
+
+	ShaderViz voxelEdges("shaders/vertex_common.vs", "shaders/voxel_edges.fs");
+	voxelEdges.setTex0Texture(tex_noise2);
+	voxelEdges.setTex1Texture(tex_tex07);
+	voxelEdges.setTex2Texture(tex_tex06);
+
+
+//	ShaderViz shaderFlames("shaders/vertex_common.vs", "shaders/flames.fs");
+//	shaderFlames.setTex0Texture(tex_noise2);
+
+	ShaderViz noiseBlur("shaders/vertex_common.vs", "shaders/noise_blur.fs");
+
+	//ShaderViz shaderWaves("shaders/vertex_common.vs", "shaders/waves.fs");
+
 	overlayImage = new ShaderViz("shaders/vertex_common.vs", "shaders/overlay_image.fs");
 
 	loadOverlays();
@@ -670,6 +719,12 @@ int main(int argc, char * argv[])
 	visualizers.push_back(&waveFloor);
 	visualizers.push_back(&hexField2);
 	visualizers.push_back(&spaceRace);
+	visualizers.push_back(&truchetTentacles);
+	visualizers.push_back(&circlePattern);
+	visualizers.push_back(&fireShader);
+	visualizers.push_back(&dubstepMyAss);
+	visualizers.push_back(&voxelEdges);
+	visualizers.push_back(&noiseBlur);
 
 	
 //    visualizers.push_back(&torusSwirl);
@@ -678,10 +733,13 @@ int main(int argc, char * argv[])
 //    visualizers.push_back(&rmBoxFloor);
     
 	//currentViz = &spaceRace;
+
 	srand(time(NULL));
 	vizRandom();
 	transRandom();
-    
+
+//	targetViz = &shaderWaves; manualOverride = true;
+
     float frameSlice = 0.0f;
     
     while (!glfwWindowShouldClose(window))
