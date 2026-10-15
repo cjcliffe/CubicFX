@@ -1,6 +1,12 @@
 /*
  *  FFT.h
  *  vis_testbed
+ *
+ *  Compile-time Danielson-Lanczos FFT. Instantiate as
+ *  DanielsonLanczos<BUF/2, float> and call apply() on an interleaved
+ *  complex buffer (real/imaginary pairs, data bit-reversed first, as in
+ *  captureAudio). The Sin/Cos metafunctions below are superseded by the
+ *  runtime sin() calls in apply() and kept for reference.
  */
 
 #pragma once
@@ -67,10 +73,8 @@ public:
 		next.apply(data+N);
 		
 		T wtemp,tempr,tempi,wr,wi,wpr,wpi;
-		//		wtemp = Sin<N,1,T>::value();
 		wtemp = sin(M_PI/N);
 		wpr = -2.0*wtemp*wtemp;
-		//		wpi = -Sin<N,2,T>::value();
 		wpi = -sin(2*M_PI/N);
 		wr = 1.0;
 		wi = 0.0;

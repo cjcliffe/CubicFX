@@ -30,6 +30,10 @@
 
 using namespace std;
 
+// ---- Audio capture ----
+// RtAudio delivers input on its own callback thread; the render thread picks
+// up complete blocks. staging accumulates callback samples, readyBlock holds
+// the latest full block, blockFresh flags it, all guarded by audioMutex.
 static RtAudio *audioIn = nullptr;
 static unsigned int audioChannels = 0;
 static vector<float> staging;
@@ -56,6 +60,7 @@ struct AudioDevInfo {
     unsigned int inChannels;
 };
 
+// List every device with at least one input channel, for the setup dialog.
 static vector<AudioDevInfo> listInputDevices() {
     vector<AudioDevInfo> devs;
     RtAudio probe;
@@ -68,6 +73,9 @@ static vector<AudioDevInfo> listInputDevices() {
     return devs;
 }
 
+// RtAudio input callback (runs on the audio thread). Mixes to mono and
+// accumulates into staging; each full BUF-sized block is published to
+// readyBlock. Only locking and copying here, no allocation or prints.
 static int audioCallback(void *outputBuffer, void *inputBuffer, unsigned int nFrames,
     double streamTime, RtAudioStreamStatus status, void *userData) {
     if (status) {
@@ -97,6 +105,9 @@ static int audioCallback(void *outputBuffer, void *inputBuffer, unsigned int nFr
     return 0;
 }
 
+// Open a float32 input stream on deviceId (stereo when the device offers 2+
+// channels, else mono), preferring SRATE and falling back to the device's
+// first supported rate. Returns false if the device can't provide input.
 static bool openAudio(unsigned int deviceId) {
     audioIn = new RtAudio();
     RtAudio::DeviceInfo info = audioIn->getDeviceInfo(deviceId);
@@ -151,6 +162,7 @@ static bool openAudio(unsigned int deviceId) {
     return true;
 }
 
+// Stop and release the audio stream; safe to call with no stream open.
 static void closeAudio() {
     if (audioIn != nullptr) {
         if (audioIn->isStreamRunning()) {
@@ -170,6 +182,9 @@ static bool agcEnabled = true;
 static bool testToneEnabled = false;
 static double tonePhase = 0.0;
 
+// Automatic gain: strip DC, steer the block peak toward 0.9 with a smoothed
+// gain (fast attack 0.4, slow release 0.03, clamped to 0.5x-32x so silence
+// freezes the gain instead of pumping noise), then soft-clip with tanh.
 static void normalizeAudioBlock(vector<float> &block) {
     double mean = 0.0;
     for (float v : block) {
@@ -202,6 +217,9 @@ static void normalizeAudioBlock(vector<float> &block) {
     }
 }
 
+// Stand-in input: 440 + 660 + 90 Hz mix at a healthy level, so shaders can
+// be exercised with no microphone. Phase wraps hourly on exact cycle
+// boundaries to stay click-free.
 static void synthesizeTestTone() {
     const float twoPi = 2.0f * 3.14159265f;
     sample_data.assign(BUF, 0.0f);
@@ -217,6 +235,9 @@ static void synthesizeTestTone() {
     }
 }
 
+// Per-frame audio step: test tone, or the latest captured block (optional
+// gain), then in-place FFT into fft_data for the shaders and BeatDetektor.
+// Skips silently when no fresh block arrived this frame.
 static void captureAudio() {
     if (testToneEnabled) {
         synthesizeTestTone();
@@ -265,6 +286,9 @@ static void captureAudio() {
     dlfft.apply(&fft_data[0]);
 }
 
+// ---- Beat detection ----
+
+// Create the low/high-range detectors, VU follower, and BPM contest.
 void initBD() {
     det_low = new BeatDetektor(90,160);
     det_high = new BeatDetektor(140, 260);
@@ -278,6 +302,8 @@ void initBD() {
     contest->finish_line = 1000;
 }
 
+// Feed both detectors the low/high 256-sample FFT windows, run the contest
+// on the selected range, and update VU levels from the winning BPM.
 void processBD(float timer_seconds, float dt) {
     int x;
 
@@ -301,10 +327,13 @@ void processBD(float timer_seconds, float dt) {
     contest->run();
 }
 
+// ---- Visualizer control ----
+
 Visualizer *currentViz = NULL;
 vector<Visualizer *> visualizers;
 vector<Texture2D> overlays;
 
+// Overlay PNGs, in Shift+1..6 order.
 static void loadOverlays() {
     overlays.push_back(LoadTexture("png/OFFSET.png"));
     overlays.push_back(LoadTexture("png/JACK.png"));
@@ -318,7 +347,6 @@ Visualizer *overlayImage;
 Visualizer *targetViz = NULL;
 
 float transition_timer = 0.0;
-int transition = 0;
 bool in_transition = false;
 
 enum transitionType {
@@ -341,6 +369,7 @@ float autoTimer = 0;
 float autoTimerLimit = 30;
 bool manualOverride = false;
 
+// Pick a random visualizer; seeds currentViz on first call.
 void vizRandom() {
     int nextViz = (int)floor(((float)rand() / (float)RAND_MAX)*visualizers.size());
     if (nextViz > (int)visualizers.size() - 1) nextViz = (int)visualizers.size() - 1;
@@ -350,6 +379,7 @@ void vizRandom() {
     }
 }
 
+// Pick a random crossfade/wipe/zoom transition.
 void transRandom() {
     trans_type = (transitionType)(int)floor(((float)rand() / (float)RAND_MAX)*TRANS_MAX);
 }
@@ -358,6 +388,7 @@ static bool shiftHeld() {
     return IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
 }
 
+// Map a pressed key to its visualizer; order matches the push_back sequence.
 static Visualizer *vizKey(int key) {
     switch (key) {
     case KEY_ONE: return visualizers[0];
@@ -417,6 +448,11 @@ static const int vizKeys[] = {
     KEY_SEMICOLON, KEY_APOSTROPHE, KEY_MINUS, KEY_EQUAL
 };
 
+// Poll this frame's input. With Shift: overlay image select (1-6) and
+// overlay toggle (0), re-pressing the same image reverses its fade.
+// Otherwise: visualizer select, Space for random viz+transition (clears
+// manual override), Up/Down for the beat-detector range. Any direct viz
+// choice sets manual override, which stops auto-advance and idle alpha.
 static void pollKeys() {
     if (shiftHeld()) {
         bool doChange = false;
@@ -472,6 +508,10 @@ static void pollKeys() {
     }
 }
 
+// ---- Setup dialog ----
+
+// Everything the dialog edits; width/height are the source of truth,
+// resPreset is the matching preset index (-1 = custom size).
 struct SetupChoice {
     int monitor = 0;
     bool fullscreen = false;
@@ -489,6 +529,9 @@ struct ResPreset {
     int height;
 };
 
+// Render-resolution presets for one monitor: standard sizes that fit inside
+// the current mode (largest first), plus the exact native size when no
+// standard size matches it.
 static vector<ResPreset> buildResPresets(int monitor) {
     static const int master[][2] = {
         { 3840, 2160 },
@@ -536,6 +579,8 @@ static int findPreset(const vector<ResPreset> &list, int w, int h) {
     return -1;
 }
 
+// Match width/height back to a preset index (-1 when custom), clamping to
+// the largest entry when the choice exceeds the monitor.
 static void resolvePresetChoice(SetupChoice &choice, const vector<ResPreset> &list) {
     choice.resPreset = findPreset(list, choice.width, choice.height);
     if (choice.resPreset < 0 && !list.empty() &&
@@ -546,6 +591,7 @@ static void resolvePresetChoice(SetupChoice &choice, const vector<ResPreset> &li
     }
 }
 
+// Truncate a device/monitor name for fixed-width buttons.
 static string shortName(const string &name, size_t maxLen) {
     if (name.size() <= maxLen) {
         return name;
@@ -553,6 +599,8 @@ static string shortName(const string &name, size_t maxLen) {
     return name.substr(0, maxLen - 3) + "...";
 }
 
+// Immediate-mode dialog button: draws itself, returns true on click.
+// Always call during its visible frame; drawing and hit-testing are one op.
 static bool uiButton(Rectangle r, const char *label, bool selected) {
     Vector2 mouse = GetMousePosition();
     bool hover = CheckCollisionPointRec(mouse, r);
@@ -568,6 +616,10 @@ static bool uiButton(Rectangle r, const char *label, bool selected) {
 static const int DIALOG_W = 660;
 static const int DIALOG_H = 720;
 
+// Modal setup loop on the already-open window. Sections top to bottom:
+// monitor, windowed/fullscreen, resolution grid (rebuilt per monitor),
+// scrollable audio list with test-tone/auto-gain/refresh, Start. Enter
+// starts, Esc or window-close cancels (returns false).
 static bool runSetupDialog(SetupChoice &choice, vector<AudioDevInfo> &audioDevs) {
     const int dlgW = DIALOG_W;
     const int dlgH = DIALOG_H;
@@ -784,6 +836,11 @@ static bool runSetupDialog(SetupChoice &choice, vector<AudioDevInfo> &audioDevs)
     return done;
 }
 
+// ---- Frame rendering ----
+
+// Upload uniforms and draw one fullscreen viz pass into an offscreen target
+// at render size. Texture bindings happen inside display(), after the shader
+// is active (see Visualizer::bindTextures).
 static void drawVizInto(RenderTexture2D rt, Visualizer *viz, float t, float dt) {
     viz->updateVariables(t, dt, sample_data, vu->vu_levels, contest);
     BeginTextureMode(rt);
@@ -792,6 +849,9 @@ static void drawVizInto(RenderTexture2D rt, Visualizer *viz, float t, float dt) 
     EndTextureMode();
 }
 
+// Apply a mode choice to the window. Render size (VIZ_*) always follows the
+// chosen preset; the window itself is the preset in windowed mode and the
+// monitor native mode in fullscreen (render output is upscaled on compose).
 static void applyWindowMode(const SetupChoice &choice) {
     if (choice.fullscreen) {
         SetWindowSize(GetMonitorWidth(choice.monitor), GetMonitorHeight(choice.monitor));
@@ -811,6 +871,11 @@ static void applyWindowMode(const SetupChoice &choice) {
     SetWindowTitle("BeatDetektor CubicFX");
 }
 
+// One visualizer session: reset shared state, apply the window mode, build
+// the viz roster and textures, open audio, then run the frame loop until Esc
+// (returns true = back to setup) or window-close (returns false = quit).
+// Everything session-local is torn down before returning so sessions restart
+// cleanly, including GPU programs via Visualizer::unload.
 static bool runVisualizer(SetupChoice &choice)
 {
     currentViz = NULL;
@@ -973,6 +1038,7 @@ static bool runVisualizer(SetupChoice &choice)
 
         pollKeys();
 
+        // Double-click (two presses <0.4s apart within 8px) toggles fullscreen.
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             double now = GetTime();
             Vector2 mp = GetMousePosition();
@@ -1010,6 +1076,8 @@ static bool runVisualizer(SetupChoice &choice)
             printf("%f\n", alphaVal);
         }
 
+        // Advance an active crossfade/wipe/zoom; a finished transition hands
+        // currentViz over to the target.
         if (currentViz != targetViz) {
             in_transition = true;
             transition_timer += dt;
@@ -1128,6 +1196,7 @@ static bool runVisualizer(SetupChoice &choice)
             vizRandom();
         }
 
+        // Idle brightness pulse while no viz was picked manually.
         if (!manualOverride) {
             alphaVal = 0.925f + 0.075f * sinf(t*0.9f);
         }
@@ -1167,6 +1236,8 @@ static bool runVisualizer(SetupChoice &choice)
     return toMenu;
 }
 
+// Entry point: parse CLI prefill args, list audio devices, open the window
+// on the setup dialog, then alternate dialog/visualizer sessions until quit.
 int main(int argc, char * argv[])
 {
     int monitorNum = 0;

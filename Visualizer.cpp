@@ -10,9 +10,12 @@
 #include <cstdlib>
 #include <cmath>
 
+// Render size, set from the dialog's render resolution on session start.
 int VIZ_WIDTH = 1280;
 int VIZ_HEIGHT = 768;
 
+// Load the shader pair, cache every known uniform location, and allocate the
+// waveform texture when the fragment shader declares samplerTex.
 Visualizer::Visualizer(std::string vsFn, std::string fsFn) {
     timerKick = 0.0f;
     timerMid = 0.0f;
@@ -103,19 +106,14 @@ float Visualizer::floatArrayAbsAverage(float *data, int start, int end) {
     return accum;
 }
 
-float Visualizer::floatArrayMax(float *data, int start, int end) {
-    float maxv = 0;
-    for (int i = start; i < end; i++) {
-        if (data[i] > maxv) maxv = data[i];
-    }
-
-    return maxv;
-}
-
 void Visualizer::setBlendAlpha(float val) {
     blendAlpha = val;
 }
 
+// Refresh shader state for one frame: clock/resolution/mouse, VU band
+// levels and timers from vu_data, fresh random colors on each beat, the
+// waveform texture upload, and the stored blend alpha. Uniforms the shader
+// doesn't declare were cached as -1 and are skipped.
 void Visualizer::updateVariables(float time_value, float dt, std::vector<float> &sample_data, std::vector<float> &vu_data, BeatDetektorContest *contest) {
     float last_update = dt;
     if (last_update == 0.0f) {
