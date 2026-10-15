@@ -32,16 +32,16 @@ void initBD() {
 // Feed both detectors the low/high 256-sample FFT windows, run the contest
 // on the selected range, and update VU levels from the winning BPM.
 void processBD(float timer_seconds, float dt) {
-    int x;
-
-    fft_collapse.clear();
-    for (x = 0; x < 256; x++)
-    {
-        fft_collapse.push_back(fft_data[x]);
+    if (fft_collapse.size() != 512) {
+        fft_collapse.resize(512);
     }
-    for (x = BUF-256; x < BUF; x++)
+    for (int x = 0; x < 256; x++)
     {
-        fft_collapse.push_back(fft_data[x]);
+        fft_collapse[x] = fft_data[x];
+    }
+    for (int x = BUF-256; x < BUF; x++)
+    {
+        fft_collapse[x - (BUF - 512)] = fft_data[x];
     }
 
     det_low->process(timer_seconds,fft_collapse);
