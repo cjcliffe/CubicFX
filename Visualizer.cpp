@@ -209,17 +209,29 @@ void Visualizer::updateVariables(float time_value, float dt, std::vector<float> 
 
     if (loc_samplerTex >= 0 && hasSampler && sample_data.size() >= 1024) {
         UpdateTexture(samplerTexture, &sample_data[0]);
-        SetShaderValueTexture(shader, loc_samplerTex, samplerTexture);
     }
 
     if (loc_blendAlpha >= 0) {
         SetShaderValue(shader, loc_blendAlpha, &blendAlpha, SHADER_UNIFORM_FLOAT);
     }
+}
 
+void Visualizer::display(int width, int height)
+{
+    BeginShaderMode(shader);
+    bindTextures();
+    DrawRectangle(0, 0, width, height, WHITE);
+    EndShaderMode();
+}
+
+void Visualizer::bindTextures()
+{
+    if (loc_samplerTex >= 0 && hasSampler) {
+        SetShaderValueTexture(shader, loc_samplerTex, samplerTexture);
+    }
     if (loc_overlayImage >= 0 && hasOverlay) {
         SetShaderValueTexture(shader, loc_overlayImage, overlayTexture);
     }
-
     if (loc_tex0 >= 0 && hasTex0) {
         SetShaderValueTexture(shader, loc_tex0, tex0);
     }
@@ -229,13 +241,6 @@ void Visualizer::updateVariables(float time_value, float dt, std::vector<float> 
     if (loc_tex2 >= 0 && hasTex2) {
         SetShaderValueTexture(shader, loc_tex2, tex2);
     }
-}
-
-void Visualizer::display(int width, int height)
-{
-    BeginShaderMode(shader);
-    DrawRectangle(0, 0, width, height, WHITE);
-    EndShaderMode();
 }
 
 void Visualizer::unload()

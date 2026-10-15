@@ -81,5 +81,7 @@ public:
 
     void display(int width, int height);
 
+    void bindTextures();
+
     void unload();
 };

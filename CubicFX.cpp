@@ -167,6 +167,8 @@ static void closeAudio() {
 
 static float normGain = 1.0f;
 static bool agcEnabled = true;
+static bool testToneEnabled = false;
+static double tonePhase = 0.0;
 
 static void normalizeAudioBlock(vector<float> &block) {
     double mean = 0.0;
@@ -200,25 +202,43 @@ static void normalizeAudioBlock(vector<float> &block) {
     }
 }
 
-static void captureAudio() {
-    if (!audioRunning) {
-        return;
+static void synthesizeTestTone() {
+    const float twoPi = 2.0f * 3.14159265f;
+    sample_data.assign(BUF, 0.0f);
+    for (int i = 0; i < BUF; i++) {
+        float t = (float)(tonePhase + (double)i / (double)SRATE);
+        sample_data[i] = 0.5f * sinf(twoPi * 440.0f * t)
+            + 0.25f * sinf(twoPi * 660.0f * t)
+            + 0.1f * sinf(twoPi * 90.0f * t);
     }
-    bool fresh = false;
-    {
-        lock_guard<mutex> lock(audioMutex);
-        if (blockFresh) {
-            sample_data = readyBlock;
-            blockFresh = false;
-            fresh = true;
-        }
+    tonePhase += (double)BUF / (double)SRATE;
+    if (tonePhase > 3600.0) {
+        tonePhase -= 3600.0;
     }
-    if (!fresh) {
-        return;
-    }
+}
 
-    if (agcEnabled) {
-        normalizeAudioBlock(sample_data);
+static void captureAudio() {
+    if (testToneEnabled) {
+        synthesizeTestTone();
+    } else {
+        if (!audioRunning) {
+            return;
+        }
+        bool fresh = false;
+        {
+            lock_guard<mutex> lock(audioMutex);
+            if (blockFresh) {
+                sample_data = readyBlock;
+                blockFresh = false;
+                fresh = true;
+            }
+        }
+        if (!fresh) {
+            return;
+        }
+        if (agcEnabled) {
+            normalizeAudioBlock(sample_data);
+        }
     }
 
     fft_data = sample_data;
@@ -461,6 +481,7 @@ struct SetupChoice {
     unsigned int audioDevice = 0;
     int audioIndex = 0;
     bool agc = true;
+    bool testTone = false;
 };
 
 static const int resPresets[][2] = {
@@ -576,6 +597,18 @@ static bool runSetupDialog(SetupChoice &choice, vector<AudioDevInfo> &audioDevs)
         }
 
         DrawText("Audio input:", 16, (int)y, 20, LIGHTGRAY);
+        Rectangle toneHit = { 150, y - 4, 140, 26 };
+        Vector2 toneMouse = GetMousePosition();
+        bool toneHover = CheckCollisionPointRec(toneMouse, toneHit);
+        if (toneHover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            choice.testTone = !choice.testTone;
+        }
+        float toneBoxY = toneHit.y + 5;
+        DrawRectangleLinesEx({ toneHit.x, toneBoxY, 16, 16 }, 1, LIGHTGRAY);
+        if (choice.testTone) {
+            DrawRectangle((int)toneHit.x + 3, (int)toneBoxY + 3, 10, 10, SKYBLUE);
+        }
+        DrawText("Test tone", (int)toneHit.x + 22, (int)(toneHit.y + 3), 20, toneHover ? RAYWHITE : LIGHTGRAY);
         Rectangle agcHit = { (float)dlgW - 116 - 8 - 160, y - 4, 160, 26 };
         Vector2 agcMouse = GetMousePosition();
         bool agcHover = CheckCollisionPointRec(agcMouse, agcHit);
@@ -723,6 +756,7 @@ static bool runVisualizer(SetupChoice &choice)
     fft_data.assign(BUF, 0.0f);
     normGain = 1.0f;
     agcEnabled = choice.agc;
+    testToneEnabled = choice.testTone;
     {
         lock_guard<mutex> lock(audioMutex);
         staging.clear();
@@ -812,7 +846,9 @@ static bool runVisualizer(SetupChoice &choice)
 
     loadOverlays();
 
-    if (!openAudio(choice.audioDevice)) {
+    if (choice.testTone) {
+        printf("Using synthesized test tone input.\n");
+    } else if (!openAudio(choice.audioDevice)) {
         printf("Continuing without audio input.\n");
     }
 
