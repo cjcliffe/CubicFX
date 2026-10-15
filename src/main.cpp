@@ -67,21 +67,19 @@ int main(int argc, char * argv[])
 
     applyUiStyle();
 
-    if (!runSetupDialog(choice, audioDevs)) {
-        CloseWindow();
-        return 0;
-    }
-
-    while (runVisualizer(choice)) {
+    while (true) {
+        if (!runSetupDialog(choice, audioDevs)) {
+            break;
+        }
+        if (!runVisualizer(choice)) {
+            break;
+        }
         if (IsWindowFullscreen()) {
             ToggleFullscreen();
         }
         SetWindowSize(DIALOG_W, DIALOG_H);
         SetWindowMonitor(choice.monitor);
         SetWindowTitle("CubicFX Setup");
-        if (!runSetupDialog(choice, audioDevs)) {
-            break;
-        }
     }
 
     printf("\n-----\nDone.\n");
