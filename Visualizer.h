@@ -80,4 +80,6 @@ public:
     void setBlendAlpha(float val);
 
     void display(int width, int height);
+
+    void unload();
 };

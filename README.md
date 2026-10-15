@@ -53,4 +53,4 @@ CubicFX.exe [monitor] [width height] [autoTimerLimit]
 - `Shift` + `1`–`6` — overlay image select, `Shift` + `0` — toggle overlay
 - `Up` / `Down` — beat detector high/low range mode
 - `PageUp` / `PageDown` (or `,` / `.`, `Shift` for coarse) — global alpha
-- `Esc` — quit
+- `Esc` — back to setup (quit from the setup dialog)

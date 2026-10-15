@@ -237,3 +237,15 @@ void Visualizer::display(int width, int height)
     DrawRectangle(0, 0, width, height, WHITE);
     EndShaderMode();
 }
+
+void Visualizer::unload()
+{
+    if (shader.id > 0) {
+        UnloadShader(shader);
+        shader.id = 0;
+    }
+    if (hasSampler) {
+        UnloadTexture(samplerTexture);
+        hasSampler = false;
+    }
+}

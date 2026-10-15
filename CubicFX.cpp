@@ -453,11 +453,12 @@ static bool uiButton(Rectangle r, const char *label, bool selected) {
     return clicked;
 }
 
+static const int DIALOG_W = 660;
+static const int DIALOG_H = 720;
+
 static bool runSetupDialog(SetupChoice &choice, const vector<AudioDevInfo> &audioDevs) {
-    const int dlgW = 660;
-    const int dlgH = 720;
-    InitWindow(dlgW, dlgH, "CubicFX Setup");
-    SetTargetFPS(60);
+    const int dlgW = DIALOG_W;
+    const int dlgH = DIALOG_H;
 
     int monitorCount = GetMonitorCount();
     if (choice.monitor < 0 || choice.monitor >= monitorCount) {
@@ -469,11 +470,15 @@ static bool runSetupDialog(SetupChoice &choice, const vector<AudioDevInfo> &audi
     }
 
     bool done = false;
+    bool cancelled = false;
     float audioScroll = 0.0f;
     bool draggingScroll = false;
-    while (!WindowShouldClose() && !done) {
+    while (!WindowShouldClose() && !done && !cancelled) {
         if (IsKeyPressed(KEY_ENTER)) {
             done = true;
+        }
+        if (IsKeyPressed(KEY_ESCAPE)) {
+            cancelled = true;
         }
 
         float y = 12;
@@ -622,11 +627,7 @@ static bool runSetupDialog(SetupChoice &choice, const vector<AudioDevInfo> &audi
         EndDrawing();
     }
 
-    bool quit = WindowShouldClose() && !done;
-    if (quit) {
-        CloseWindow();
-    }
-    return !quit;
+    return done;
 }
 
 static void drawVizInto(RenderTexture2D rt, Visualizer *viz, float t, float dt) {
@@ -637,59 +638,26 @@ static void drawVizInto(RenderTexture2D rt, Visualizer *viz, float t, float dt) 
     EndTextureMode();
 }
 
-int main(int argc, char * argv[])
+static bool runVisualizer(SetupChoice &choice)
 {
-    int monitorNum = 0;
-    int ovrWidth = 0;
-    int ovrHeight = 0;
-
-    if (argc > 1) {
-        if (argc >= 2) {
-            sscanf(argv[1], "%d", &monitorNum);
-        }
-        if (argc >= 4) {
-            sscanf(argv[2], "%d", &ovrWidth);
-            sscanf(argv[3], "%d", &ovrHeight);
-        }
-        if (argc >= 5) {
-            sscanf(argv[4], "%f", &autoTimerLimit);
-        }
-    }
-
-    vector<AudioDevInfo> audioDevs = listInputDevices();
-    printf("Available input devices are:\n");
-    for (auto &d : audioDevs) {
-        printf("**%s** (%u in)\n", d.name.c_str(), d.inChannels);
-    }
-
-    SetupChoice choice;
-    if (monitorNum > 0) {
-        choice.monitor = monitorNum - 1;
-    }
-    if (ovrWidth && ovrHeight) {
-        choice.width = ovrWidth;
-        choice.height = ovrHeight;
-        choice.resPreset = -1;
-        for (int i = 0; i < numResPresets; i++) {
-            if (resPresets[i][0] == ovrWidth && resPresets[i][1] == ovrHeight) {
-                choice.resPreset = i;
-                break;
-            }
-        }
-    }
-    if (!audioDevs.empty()) {
-        choice.audioDevice = audioDevs[0].id;
-        for (int i = 0; i < (int)audioDevs.size(); i++) {
-            if (audioDevs[i].id == (unsigned int)RtAudio().getDefaultInputDevice()) {
-                choice.audioIndex = i;
-                choice.audioDevice = audioDevs[i].id;
-                break;
-            }
-        }
-    }
-
-    if (!runSetupDialog(choice, audioDevs)) {
-        return 0;
+    currentViz = NULL;
+    targetViz = NULL;
+    transition_timer = 0.0f;
+    in_transition = false;
+    lastImage = -1;
+    thisImage = 0;
+    overlayAlpha = 0.0f;
+    overlayDelta = 0.0f;
+    overlayEnabled = false;
+    autoTimer = 0;
+    manualOverride = false;
+    alphaVal = 1.0f;
+    sample_data.assign(BUF, 0.0f);
+    fft_data.assign(BUF, 0.0f);
+    {
+        lock_guard<mutex> lock(audioMutex);
+        staging.clear();
+        blockFresh = false;
     }
 
     if (choice.fullscreen) {
@@ -775,15 +743,9 @@ int main(int argc, char * argv[])
 
     loadOverlays();
 
-    if (!audioDevs.empty()) {
-        if (!openAudio(choice.audioDevice)) {
-            printf("Continuing without audio input.\n");
-        }
-    } else {
-        printf("No audio input devices, continuing without audio.\n");
+    if (!openAudio(choice.audioDevice)) {
+        printf("Continuing without audio input.\n");
     }
-    sample_data.assign(BUF, 0.0f);
-    fft_data.assign(BUF, 0.0f);
 
     visualizers.push_back(&vizRgbFlares);
     visualizers.push_back(&sparklingSine);
@@ -828,7 +790,6 @@ int main(int argc, char * argv[])
     visualizers.push_back(&voxelEdges);
     visualizers.push_back(&noiseBlur);
 
-    srand((unsigned int)time(NULL));
     vizRandom();
     transRandom();
 
@@ -840,7 +801,8 @@ int main(int argc, char * argv[])
 
     SetTargetFPS(60);
 
-    while (!WindowShouldClose())
+    bool toMenu = false;
+    while (!WindowShouldClose() && !toMenu)
     {
         float dt = GetFrameTime();
         float t = (float)GetTime();
@@ -849,6 +811,10 @@ int main(int argc, char * argv[])
         processBD(t, dt);
 
         pollKeys();
+
+        if (IsKeyPressed(KEY_ESCAPE)) {
+            toMenu = true;
+        }
 
         float alphaDir = 0.0f;
         if (IsKeyDown(KEY_PAGE_DOWN) || IsKeyDown(KEY_COMMA)) {
@@ -990,10 +956,106 @@ int main(int argc, char * argv[])
     for (auto &tex : overlays) {
         UnloadTexture(tex);
     }
+    overlays.clear();
     UnloadTexture(tex_noise);
     UnloadTexture(tex_noise2);
     UnloadTexture(tex_tex06);
     UnloadTexture(tex_tex07);
+    for (auto *viz : visualizers) {
+        viz->unload();
+    }
+    visualizers.clear();
+    overlayImage->unload();
+    delete overlayImage;
+    overlayImage = NULL;
+    delete det_low;
+    delete det_high;
+    delete vu;
+    delete contest;
+    det_low = NULL;
+    det_high = NULL;
+    det = NULL;
+    vu = NULL;
+    contest = NULL;
+
+    return toMenu;
+}
+
+int main(int argc, char * argv[])
+{
+    int monitorNum = 0;
+    int ovrWidth = 0;
+    int ovrHeight = 0;
+
+    if (argc > 1) {
+        if (argc >= 2) {
+            sscanf(argv[1], "%d", &monitorNum);
+        }
+        if (argc >= 4) {
+            sscanf(argv[2], "%d", &ovrWidth);
+            sscanf(argv[3], "%d", &ovrHeight);
+        }
+        if (argc >= 5) {
+            sscanf(argv[4], "%f", &autoTimerLimit);
+        }
+    }
+
+    vector<AudioDevInfo> audioDevs = listInputDevices();
+    printf("Available input devices are:\n");
+    for (auto &d : audioDevs) {
+        printf("**%s** (%u in)\n", d.name.c_str(), d.inChannels);
+    }
+
+    SetupChoice choice;
+    if (monitorNum > 0) {
+        choice.monitor = monitorNum - 1;
+    }
+    if (ovrWidth && ovrHeight) {
+        choice.width = ovrWidth;
+        choice.height = ovrHeight;
+        choice.resPreset = -1;
+        for (int i = 0; i < numResPresets; i++) {
+            if (resPresets[i][0] == ovrWidth && resPresets[i][1] == ovrHeight) {
+                choice.resPreset = i;
+                break;
+            }
+        }
+    }
+    if (!audioDevs.empty()) {
+        choice.audioDevice = audioDevs[0].id;
+        for (int i = 0; i < (int)audioDevs.size(); i++) {
+            if (audioDevs[i].id == (unsigned int)RtAudio().getDefaultInputDevice()) {
+                choice.audioIndex = i;
+                choice.audioDevice = audioDevs[i].id;
+                break;
+            }
+        }
+    }
+
+    srand((unsigned int)time(NULL));
+
+    InitWindow(DIALOG_W, DIALOG_H, "CubicFX Setup");
+    SetTargetFPS(60);
+    SetExitKey(0);
+
+    if (!runSetupDialog(choice, audioDevs)) {
+        CloseWindow();
+        return 0;
+    }
+
+    while (runVisualizer(choice)) {
+        if (IsWindowFullscreen()) {
+            ToggleFullscreen();
+        }
+        SetWindowSize(DIALOG_W, DIALOG_H);
+        SetWindowMonitor(choice.monitor);
+        SetWindowTitle("CubicFX Setup");
+        if (!runSetupDialog(choice, audioDevs)) {
+            break;
+        }
+    }
+
+    printf("\n-----\nDone.\n");
     CloseWindow();
 
     return 0;
