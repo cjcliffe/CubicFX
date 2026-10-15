@@ -11,7 +11,7 @@
 
 #include <raylib.h>
 
-#include "BeatDetektor.h"
+#include "beat/BeatDetektor.h"
 
 extern int VIZ_WIDTH;
 extern int VIZ_HEIGHT;

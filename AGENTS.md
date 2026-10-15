@@ -12,7 +12,7 @@ CMake-based (minimum 3.16, C++17). See `CMakeLists.txt` for build configuration.
 
 ## Key Directories
 
-- Root — Application source: `CubicFX.cpp` (setup dialog, RtAudio capture on a callback thread handed to the render thread under a mutex, visualizer list, keyboard control, render-texture transitions), `Visualizer.cpp/.h` (raylib shader wrapper and per-frame uniforms), `BeatDetektor.cpp/.h` (beat detection), `FFT.h` (FFT)
+- `src/` — Application source: `main.cpp` (entry, CLI prefill, setup/session loop), `app/` (visualizer session: roster, keyboard control, render-texture transitions), `audio/` (RtAudio capture handed to the render thread under a mutex, `FFT.h`), `beat/` (beat-detection glue plus `BeatDetektor.*`), `ui/` (setup dialog, global raygui theme, `Flex.h`), `viz/` (`Visualizer.cpp/.h`, raylib shader wrapper and per-frame uniforms)
 - `shaders/` — Shared `vertex_common.vs` (raylib-style, transforms by the `mvp` uniform) plus many `.fs` effects; `GLSL_Heroku/` holds additional effects. Audio-waveform samplers are `sampler2D` backed by a 1024x1 float texture, not `sampler1D`
 - `png/` — Overlay images and noise/texture inputs loaded at runtime
 
