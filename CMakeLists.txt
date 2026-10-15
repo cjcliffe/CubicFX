@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 3.16)
 
 macro(configure_files srcDir destDir)
     message(STATUS "Configuring directory ${destDir}")
@@ -35,35 +35,43 @@ macro(configure_files_recurse srcDir destDir)
     endforeach(templateFile)
 endmacro(configure_files_recurse)
 
-project (ShaderFX)
+project (CubicFX)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 SET( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 SET( CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${PROJECT_BINARY_DIR})
 SET( CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${PROJECT_BINARY_DIR})
 
-add_subdirectory(${PROJECT_SOURCE_DIR}/glfw-3.0.3 ${PROJECT_BINARY_DIR}/glfw/)
-include_directories(${PROJECT_SOURCE_DIR}/glfw-3.0.3/include)
-include_directories ( ${PROJECT_SOURCE_DIR}/../CubicVR-2/build/include )
-link_directories ( ${PROJECT_SOURCE_DIR}/../CubicVR-2/build/lib )
+include(FetchContent)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
+set(RTAUDIO_BUILD_TESTING OFF CACHE BOOL "" FORCE)
 
+FetchContent_Declare(
+    raylib
+    GIT_REPOSITORY https://github.com/raysan5/raylib.git
+    GIT_TAG 6.0
+    GIT_SHALLOW TRUE
+)
+FetchContent_Declare(
+    rtaudio
+    GIT_REPOSITORY https://github.com/thestk/rtaudio.git
+    GIT_TAG 6.0.1
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(raylib rtaudio)
 
-IF (DEFINED WIN32)
-	include_directories ( ${PROJECT_SOURCE_DIR}/openal-soft-1.15.1/include )
-	link_directories ( ${PROJECT_SOURCE_DIR}/openal-soft-1.15.1/lib/Win64 )
-	SET (OPENAL_LIBRARY libOpenAL32.dll winmm)
-ELSE (DEFINED WIN32)
-	find_package (OpenAL)
-ENDIF (DEFINED WIN32)
-
-SET (shaderfx_sources
-    main.cpp
-    ShaderViz.cpp
+SET (cubicfx_sources
+    CubicFX.cpp
+    Visualizer.cpp
 	BeatDetektor.cpp
 )
 
-SET (shaderfx_headers
-    ShaderViz.h
+SET (cubicfx_headers
+    Visualizer.h
 	FFT.h
 	BeatDetektor.h
 )
@@ -72,9 +80,12 @@ configure_files(${PROJECT_SOURCE_DIR}/shaders ${PROJECT_BINARY_DIR}/shaders COPY
 configure_files(${PROJECT_SOURCE_DIR}/png ${PROJECT_BINARY_DIR}/png COPYONLY)
 
 
-add_executable(ShaderFX ${shaderfx_sources} ${shaderfx_headers})
+add_executable(CubicFX ${cubicfx_sources} ${cubicfx_headers})
 
-target_link_libraries(ShaderFX cubicvr2 glfw ${GLFW_LIBRARIES} ${OPENAL_LIBRARY})
+if (MSVC)
+    target_compile_definitions(CubicFX PRIVATE _USE_MATH_DEFINES)
+endif ()
 
+target_link_libraries(CubicFX PRIVATE raylib rtaudio)
 
 

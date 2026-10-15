@@ -6,7 +6,7 @@ uniform float time;
 uniform float vuData[128];
 uniform vec3 randColor;
 uniform float blendAlpha;
-uniform sampler1D samplerTex;
+uniform sampler2D samplerTex;
 uniform float sampleRange;
 uniform float vuLow, vuMid, vuHigh;
 
@@ -55,7 +55,7 @@ void main(void)
 	vec3 ledColor = led*color*mask;
 
     // second texture row is the sound wave
-	float wave = (texture(samplerTex,uv.x*0.25).r / (sampleRange*20.0))  +0.5;   //texture2D( iChannel0, vec2(uv.x, 0.75) ).x;
+	float wave = (texture(samplerTex,vec2(uv.x*0.25, 0.5)).r / (sampleRange*20.0))  +0.5;   //texture2D( iChannel0, vec2(uv.x, 0.75) ).x;
 	vec3 waveColor = randColor*0.015 / abs(wave - uv.y);
 		
 	// output final color
