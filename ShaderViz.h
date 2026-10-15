@@ -1,102 +1,83 @@
 //
-//  ShaderFX.h
+//  ShaderViz.h
 //
 //  Copyright (c) 2013 Charles J. Cliffe. All rights reserved.
 //
 
-#ifndef __CubicVR2__ShaderRenderTest__
-#define __CubicVR2__ShaderRenderTest__
-
-#include <iostream>
-#include "cubicvr2/opengl/Shader.h"
-#include "cubicvr2/opengl/Material.h"
-#include "cubicvr2/core/Mesh.h"
-#include "cubicvr2/core/Camera.h"
-#include "cubicvr2/opengl/Texture.h";
-
-#include <math.h>
-#include "BeatDetektor.h"
-
 #pragma once
+
+#include <string>
+#include <vector>
+
+#include <raylib.h>
+
+#include "BeatDetektor.h"
 
 extern int VIZ_WIDTH;
 extern int VIZ_HEIGHT;
 
-namespace CubicVR {
-    
-    
-    class ShaderViz {
-    public:
-        Shader vizShader;
-        
-        shaderVariables shaderVars;
-        
-        shaderAttributeVec3 a_vertexPosition;
-        shaderUniformVec2 u_resolution;
-        shaderUniformFloat u_time;
-        shaderUniformVec2 u_mouse;
-        
-        shaderUniformFloatVector u_sampleData;
-        shaderUniformFloatVector u_vuData;
-        shaderUniformVec3 u_baseColor;
-        
-        shaderUniformFloat u_vuLow;
-        shaderUniformFloat u_vuMid;
-        shaderUniformFloat u_vuHigh;
-        
-        shaderUniformVec3 u_randColor;
-        shaderUniformVec3 u_randColor2;
-        shaderUniformInt u_beatCounter;
-        shaderUniformInt u_beatCounterHalf;
-        shaderUniformInt u_beatCounterQuarter;
-        
-        shaderUniformFloat u_timerKick;
-        shaderUniformFloat u_timerMid;
-        shaderUniformFloat u_timerHigh;
-        shaderUniformFloat u_sampleRange;
-		shaderUniformFloat u_blendAlpha;
+class ShaderViz {
+public:
+    Shader shader;
 
-		shaderUniformSampler2D u_samplerTex;
-		shaderUniformSampler2D u_overlayImage;
+    int loc_resolution;
+    int loc_time;
+    int loc_mouse;
+    int loc_vuData;
+    int loc_baseColor;
+    int loc_vuLow;
+    int loc_vuMid;
+    int loc_vuHigh;
+    int loc_randColor;
+    int loc_randColor2;
+    int loc_beatCounter;
+    int loc_beatCounterHalf;
+    int loc_beatCounterQuarter;
+    int loc_timerKick;
+    int loc_timerMid;
+    int loc_timerHigh;
+    int loc_sampleRange;
+    int loc_blendAlpha;
+    int loc_samplerTex;
+    int loc_overlayImage;
+    int loc_tex0;
+    int loc_tex1;
+    int loc_tex2;
 
-		shaderUniformSampler2D u_tex0, u_tex1, u_tex2;
-        
-		GLuint samplerTex;
-		GLuint samplerTexSampler;
+    float randColor[3];
+    float randColor2[3];
+    int lastBeat;
 
-		Texture *overlayTexture;
-		Texture *tex0Texture;
-		Texture *tex1Texture;
-		Texture *tex2Texture;
+    float timerKick;
+    float timerMid;
+    float timerHigh;
+    float blendAlpha;
 
-        vec3 randColor, randColor2;
-        int lastBeat;
-        float lastTime;
-		        
-        float timerKick, timerMid, timerHigh;
-        
-        Mesh fsQuadMesh;
-        
-        ShaderViz(string vsFn, string fsFn);
-        
-		void setOverlayTexture(Texture *oTex);
-		void setTex0Texture(Texture *tex);
-		void setTex1Texture(Texture *tex);
-		void setTex2Texture(Texture *tex);
+    Texture2D overlayTexture;
+    bool hasOverlay;
+    Texture2D tex0;
+    bool hasTex0;
+    Texture2D tex1;
+    bool hasTex1;
+    Texture2D tex2;
+    bool hasTex2;
 
-        float floatArrayAverage(float *data, int start, int end);
-        float floatArrayAbsAverage(float *data, int start, int end);
-		float floatArrayMax(float *data, int start, int end);
-		
-        
-        void updateVariables(float time_value, vector<float> &sample_data, vector<float> &vu_data, BeatDetektorContest *contest);
-		void setBlendAlpha(float val);
-        
-        void display();
+    Texture2D samplerTexture;
+    bool hasSampler;
 
-        
-        void init(string vsFn, string fsFn);
-    };
-}
+    ShaderViz(std::string vsFn, std::string fsFn);
 
-#endif /* defined(__CubicVR2__ShaderRenderTest__) */
+    void setOverlayTexture(Texture2D oTex);
+    void setTex0Texture(Texture2D tex);
+    void setTex1Texture(Texture2D tex);
+    void setTex2Texture(Texture2D tex);
+
+    float floatArrayAverage(float *data, int start, int end);
+    float floatArrayAbsAverage(float *data, int start, int end);
+    float floatArrayMax(float *data, int start, int end);
+
+    void updateVariables(float time_value, float dt, std::vector<float> &sample_data, std::vector<float> &vu_data, BeatDetektorContest *contest);
+    void setBlendAlpha(float val);
+
+    void display(int width, int height);
+};

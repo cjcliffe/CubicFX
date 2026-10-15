@@ -9,7 +9,7 @@ uniform vec3 randColor,randColor2;
 uniform float blendAlpha;
 uniform float vuLow;
 
-uniform sampler1D samplerTex;
+uniform sampler2D samplerTex;
 uniform float sampleRange;
 
 vec3 planeVUMatrix(vec2 uv) {
@@ -57,7 +57,7 @@ void main(void)
 	uv.y += 0.1;
 	for(float i = 0.0; i < 10.0; i++) 
 	{
-		float soundOffset = texture(samplerTex,(gl_FragCoord.x/resolution.x)*0.25).r / (sampleRange*120.0); //texture2D(iChannel0, vec2(0.5 + uv.x / 20.0, i / 7.0)).x; 
+		float soundOffset = texture(samplerTex,vec2((gl_FragCoord.x/resolution.x)*0.25, 0.5)).r / (sampleRange*120.0); //texture2D(iChannel0, vec2(0.5 + uv.x / 20.0, i / 7.0)).x; 
 		uv.y += 0.07 * pow(sin(uv.x + i/7.0 + time),2.0) + soundOffset;//(0.07 * sin(uv.x + i/7.0 + time ));
 		wave_width = abs(1.0 / (150.0 * uv.y));
 		wave_color += vec3(wave_width * 1.9, wave_width, wave_width * 1.5);

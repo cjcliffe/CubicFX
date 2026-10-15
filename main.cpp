@@ -1,33 +1,27 @@
 //
 //  main.cpp
-//  CubicVR2Test
+//  ShaderFX (raylib)
 //
-//  Created by Charles J. Cliffe on 2013-02-23.
 //  Copyright (c) 2013 Charles J. Cliffe. All rights reserved.
 //
 
-#include <iostream>
-#include <time.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+#include <cmath>
+#include <string>
+#include <vector>
+#include <mutex>
+
+#define NOMINMAX
+#define NOGDI
+#define NOUSER
+
+#include <raylib.h>
+#include <RtAudio.h>
 
 #include "ShaderViz.h"
-#ifdef _WIN32
-	#define GLFW_INCLUDE_NONE
-#else
-	#define GLFW_INCLUDE_GLCOREARB
-#endif
-#include <GLFW/glfw3.h>
-
-#ifdef WIN32
-#include <AL/al.h>
-#include <AL/alc.h>
-#else
-#include <OpenAL/al.h>
-#include <OpenAL/alc.h>
-#endif
-
-#include <cubicvr2/core/Timer.h>
-#include <cubicvr2/opengl/Texture.h>
-
 #include "FFT.h"
 #include "BeatDetektor.h"
 
@@ -36,18 +30,17 @@
 
 using namespace std;
 
-ALCdevice *audio_device;
-ALbyte audio_buffer[SRATE*2];
-ALint samples;
+static RtAudio *audioIn = nullptr;
+static unsigned int audioChannels = 0;
+static vector<float> staging;
+static vector<float> readyBlock;
+static bool blockFresh = false;
+static bool audioRunning = false;
+static mutex audioMutex;
 
 vector<float> sample_data;
 vector<float> fft_data;
 vector<float> fft_collapse;
-
-using namespace CubicVR;
-
-Timer visTimer;
-bool bpm_latch = false;
 
 BeatDetektor *det_low;
 BeatDetektor *det_high;
@@ -55,66 +48,146 @@ BeatDetektor *det;
 BeatDetektorVU *vu;
 BeatDetektorContest *contest;
 
-float alphaVec;
 float alphaVal = 1.0;
 
-int initAudio() {
-	ALenum err = alGetError();
-	const ALchar *pDeviceList = alcGetString(NULL, ALC_CAPTURE_DEVICE_SPECIFIER);
-	if (pDeviceList) {
-		printf("Available Capture Devices are:\n");
-		while (*pDeviceList) {
-			printf("**%s**\n", pDeviceList);
-			pDeviceList += strlen(pDeviceList) + 1;
-		}
-	}
+struct AudioDevInfo {
+    unsigned int id;
+    string name;
+    unsigned int inChannels;
+};
 
-	audio_device = alcCaptureOpenDevice(NULL, SRATE, AL_FORMAT_STEREO16, BUF);
-	err = alGetError();
-	if (err != AL_NO_ERROR) {
-		switch (err) {
-		case AL_INVALID_OPERATION:
-			printf("alcCaptureOpenDevice reports Invalid Operation?\n");
-			break;
-		case AL_INVALID_VALUE:
-			printf("alcCaptureOpenDevice reports Invalid Value\n");
-			return 0;
-		case ALC_OUT_OF_MEMORY:
-			printf("alcCaptureOpenDevice reports Out Of Memory\n");
-			return 0;
-		}
-	}
-	alcCaptureStart(audio_device);
-
-	sample_data.resize(BUF);
-	fft_data.resize(BUF);
-    
-    return 1;
+static vector<AudioDevInfo> listInputDevices() {
+    vector<AudioDevInfo> devs;
+    RtAudio probe;
+    for (unsigned int id : probe.getDeviceIds()) {
+        RtAudio::DeviceInfo info = probe.getDeviceInfo(id);
+        if (info.inputChannels > 0) {
+            devs.push_back({ id, info.name, info.inputChannels });
+        }
+    }
+    return devs;
 }
 
-static void captureAudio(void) {
-	int x;
-	
-	int lval=32768;
-	float bval = 0.0;
-    
-	alcGetIntegerv(audio_device, ALC_CAPTURE_SAMPLES, (ALCsizei)sizeof(ALint), &samples);
-	alcCaptureSamples(audio_device, (ALCvoid *)audio_buffer, samples);
-	
-	
-	for (x=0; x<BUF; x++)
-	{
-		bval = (((float)((ALint *)audio_buffer)[x])/32767.0) / (float)lval;
-		sample_data[x]=bval;
-	}
-	
-	fft_data = sample_data;
-	
-	DanielsonLanczos <(BUF/2), float> dlfft;
-	
-	unsigned long n, m, j, i;
-	
-	// reverse-binary reindexing
+static int audioCallback(void *outputBuffer, void *inputBuffer, unsigned int nFrames,
+    double streamTime, RtAudioStreamStatus status, void *userData) {
+    if (status) {
+        printf("Audio stream overflow.\n");
+    }
+    if (inputBuffer == nullptr) {
+        return 0;
+    }
+    float *input = (float *)inputBuffer;
+    lock_guard<mutex> lock(audioMutex);
+    for (unsigned int i = 0; i < nFrames; i++) {
+        float mono = 0.0f;
+        for (unsigned int c = 0; c < audioChannels; c++) {
+            mono += input[i * audioChannels + c];
+        }
+        mono /= (float)audioChannels;
+        staging.push_back(mono);
+    }
+    while (staging.size() >= BUF) {
+        readyBlock.assign(staging.begin(), staging.begin() + BUF);
+        staging.erase(staging.begin(), staging.begin() + BUF);
+        blockFresh = true;
+        if (staging.size() > BUF) {
+            staging.erase(staging.begin(), staging.end() - BUF);
+        }
+    }
+    return 0;
+}
+
+static bool openAudio(unsigned int deviceId) {
+    audioIn = new RtAudio();
+    RtAudio::DeviceInfo info = audioIn->getDeviceInfo(deviceId);
+    if (info.inputChannels == 0) {
+        printf("Selected device has no input channels.\n");
+        delete audioIn;
+        audioIn = nullptr;
+        return false;
+    }
+    audioChannels = info.inputChannels >= 2 ? 2 : 1;
+
+    unsigned int sampleRate = SRATE;
+    bool rateOk = false;
+    for (unsigned int r : info.sampleRates) {
+        if (r == SRATE) {
+            rateOk = true;
+            break;
+        }
+    }
+    if (!rateOk && !info.sampleRates.empty()) {
+        sampleRate = info.sampleRates[0];
+        printf("Device does not support %d Hz, using %u Hz.\n", SRATE, sampleRate);
+    }
+
+    RtAudio::StreamParameters params;
+    params.deviceId = deviceId;
+    params.nChannels = audioChannels;
+    params.firstChannel = 0;
+    unsigned int bufferFrames = BUF;
+
+    RtAudioErrorType err = audioIn->openStream(nullptr, &params, RTAUDIO_FLOAT32,
+        sampleRate, &bufferFrames, &audioCallback);
+    if (err != RTAUDIO_NO_ERROR) {
+        printf("Could not open audio stream: %s\n", audioIn->getErrorText().c_str());
+        delete audioIn;
+        audioIn = nullptr;
+        return false;
+    }
+    err = audioIn->startStream();
+    if (err != RTAUDIO_NO_ERROR) {
+        printf("Could not start audio stream: %s\n", audioIn->getErrorText().c_str());
+        audioIn->closeStream();
+        delete audioIn;
+        audioIn = nullptr;
+        return false;
+    }
+
+    sample_data.assign(BUF, 0.0f);
+    fft_data.assign(BUF, 0.0f);
+    readyBlock.assign(BUF, 0.0f);
+    audioRunning = true;
+    return true;
+}
+
+static void closeAudio() {
+    if (audioIn != nullptr) {
+        if (audioIn->isStreamRunning()) {
+            audioIn->stopStream();
+        }
+        if (audioIn->isStreamOpen()) {
+            audioIn->closeStream();
+        }
+        delete audioIn;
+        audioIn = nullptr;
+    }
+    audioRunning = false;
+}
+
+static void captureAudio() {
+    if (!audioRunning) {
+        return;
+    }
+    bool fresh = false;
+    {
+        lock_guard<mutex> lock(audioMutex);
+        if (blockFresh) {
+            sample_data = readyBlock;
+            blockFresh = false;
+            fresh = true;
+        }
+    }
+    if (!fresh) {
+        return;
+    }
+
+    fft_data = sample_data;
+
+    DanielsonLanczos <(BUF/2), float> dlfft;
+
+    unsigned long n, m, j, i;
+
     n = (BUF/2)<<1;
     j=1;
     for (i=1; i<n; i+=2) {
@@ -129,93 +202,57 @@ static void captureAudio(void) {
         }
         j += m;
     };
-    
-	
-	dlfft.apply(&fft_data[0]);
-    
-    //	fvals = dft(cvals);
-	
+
+    dlfft.apply(&fft_data[0]);
 }
 
-void initBD () {
-
+void initBD() {
     det_low = new BeatDetektor(90,160);
-	det_high = new BeatDetektor(140, 260);
+    det_high = new BeatDetektor(140, 260);
 
-	det = det_low;
-//		det->detection_rate = 20.0;
-//		det->quality_reward = 20.0;
-	
-	vu = new BeatDetektorVU();
-	
-	contest = new BeatDetektorContest();
-	contest->no_contest_decay = false;
-	contest->finish_line = 1000;
+    det = det_low;
 
+    vu = new BeatDetektorVU();
+
+    contest = new BeatDetektorContest();
+    contest->no_contest_decay = false;
+    contest->finish_line = 1000;
 }
 
-void processBD() {
-    float timer_seconds = visTimer.getSeconds();
+void processBD(float timer_seconds, float dt) {
     int x;
-    
+
     fft_collapse.clear();
-	for (x = 0; x < 256; x++)
-	{
-		fft_collapse.push_back(fft_data[x]);
-	}
-	for (x = BUF-256; x < BUF; x++)
-	{
-		fft_collapse.push_back(fft_data[x]);
-	}
-    
+    for (x = 0; x < 256; x++)
+    {
+        fft_collapse.push_back(fft_data[x]);
+    }
+    for (x = BUF-256; x < BUF; x++)
+    {
+        fft_collapse.push_back(fft_data[x]);
+    }
+
     det_low->process(timer_seconds,fft_collapse);
-	det_high->process(timer_seconds, fft_collapse);
-	contest->process(timer_seconds, det);
-    
-	//det->process(timer_seconds,fft_collapse);
+    det_high->process(timer_seconds, fft_collapse);
+    contest->process(timer_seconds, det);
 
-	if (contest->win_bpm_int)
-        vu->process(det,visTimer.lastUpdateSeconds(),((float)contest->win_bpm_int/10.0));
+    if (contest->win_bpm_int)
+        vu->process(det,dt,((float)contest->win_bpm_int/10.0));
 
-
-	contest->run();
-    
+    contest->run();
 }
 
-
-Timer fpsTimer;
-ShaderViz *currentViz=NULL;
+ShaderViz *currentViz = NULL;
 vector<ShaderViz *> visualizers;
-vector<Texture *> overlays;
-
+vector<Texture2D> overlays;
 
 static void loadOverlays() {
-	Texture *tex;
-
-	tex = new Texture();
-	tex->loadPNG("png/OFFSET.png");
-	overlays.push_back(tex);
-
-	tex = new Texture();
-	tex->loadPNG("png/JACK.png");
-	overlays.push_back(tex);
-
-	tex = new Texture();
-	tex->loadPNG("png/synthamesk.png");
-	overlays.push_back(tex);
-
-	tex = new Texture();
-	tex->loadPNG("png/C64.png");
-	overlays.push_back(tex);
-
-	tex = new Texture();
-	tex->loadPNG("png/LAFO.png");
-	overlays.push_back(tex);
-
-	tex = new Texture();
-	tex->loadPNG("png/LAFOLOGO.png");
-	overlays.push_back(tex);
-
+    overlays.push_back(LoadTexture("png/OFFSET.png"));
+    overlays.push_back(LoadTexture("png/JACK.png"));
+    overlays.push_back(LoadTexture("png/synthamesk.png"));
+    overlays.push_back(LoadTexture("png/C64.png"));
+    overlays.push_back(LoadTexture("png/LAFO.png"));
+    overlays.push_back(LoadTexture("png/LAFOLOGO.png"));
 }
 
 ShaderViz *overlayImage;
@@ -226,16 +263,15 @@ int transition = 0;
 bool in_transition = false;
 
 enum transitionType {
-	TRANS_CROSSFADE,
-	TRANS_WIPERIGHT,
-	TRANS_WIPELEFT,
-	TRANS_WIPEDOWN,
-	TRANS_WIPEUP,
-	TRANS_ZOOMIN,
-	TRANS_MAX
+    TRANS_CROSSFADE,
+    TRANS_WIPERIGHT,
+    TRANS_WIPELEFT,
+    TRANS_WIPEDOWN,
+    TRANS_WIPEUP,
+    TRANS_ZOOMIN,
+    TRANS_MAX
 };
 transitionType trans_type;
-
 
 int lastImage = -1;
 int thisImage = 0;
@@ -246,681 +282,655 @@ float autoTimer = 0;
 float autoTimerLimit = 30;
 bool manualOverride = false;
 
-
-
-
-
 void vizRandom() {
-	int nextViz = (int)floor(((float)rand() / (float)RAND_MAX)*visualizers.size());
-	if (nextViz > visualizers.size() - 1) nextViz = visualizers.size() - 1;
-	targetViz = visualizers[nextViz];
-	if (currentViz == NULL) {
-		currentViz = targetViz;
-	}
+    int nextViz = (int)floor(((float)rand() / (float)RAND_MAX)*visualizers.size());
+    if (nextViz > (int)visualizers.size() - 1) nextViz = (int)visualizers.size() - 1;
+    targetViz = visualizers[nextViz];
+    if (currentViz == NULL) {
+        currentViz = targetViz;
+    }
 }
 
 void transRandom() {
-	trans_type = (transitionType)(int)floor(((float)rand() / (float)RAND_MAX)*TRANS_MAX);
+    trans_type = (transitionType)(int)floor(((float)rand() / (float)RAND_MAX)*TRANS_MAX);
 }
 
-
-
-
-static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
-{
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-        glfwSetWindowShouldClose(window, GL_TRUE);
-        return;
-    }
-    
-    
-    
-    if (action == GLFW_PRESS) {
-		bool doChange = false;
-		if (mods&GLFW_MOD_SHIFT) {
-			thisImage = -1;
-			switch (key) {
-			case GLFW_KEY_1:
-				overlayImage->setOverlayTexture(overlays[0]);
-				thisImage = 0;
-				doChange = true;
-				break;
-			case GLFW_KEY_2:
-				overlayImage->setOverlayTexture(overlays[1]);
-				thisImage = 1;
-				doChange = true;
-				break;
-			case GLFW_KEY_3:
-				overlayImage->setOverlayTexture(overlays[2]);
-				thisImage = 2;
-				doChange = true;
-				break;
-			case GLFW_KEY_4:
-				overlayImage->setOverlayTexture(overlays[3]);
-				thisImage = 3;
-				doChange = true;
-				break;
-			case GLFW_KEY_5:
-				overlayImage->setOverlayTexture(overlays[4]);
-				thisImage = 4;
-				doChange = true;
-				break;
-			case GLFW_KEY_6:
-				overlayImage->setOverlayTexture(overlays[5]);
-				thisImage = 5;
-				doChange = true;
-				break;
-			case GLFW_KEY_0:
-				overlayEnabled = !overlayEnabled;
-				overlayDelta = 0;
-				break;
-			}
-
-			if (doChange && thisImage == lastImage) {
-				overlayDelta = overlayDelta ? -overlayDelta : -1.0;
-			}
-
-			if (doChange && !overlayEnabled) {
-				overlayEnabled = true;
-				overlayDelta = -1.0;
-			}
-
-			if (thisImage != -1) lastImage = thisImage;
-
-		} else {
-			ShaderViz *tempViz = targetViz;
-			switch (key) {
-			case GLFW_KEY_1:
-				targetViz = visualizers[0];
-				break;
-			case GLFW_KEY_2:
-				targetViz = visualizers[1];
-				break;
-			case GLFW_KEY_3:
-				targetViz = visualizers[2];
-				break;
-			case GLFW_KEY_4:
-				targetViz = visualizers[3];
-				break;
-			case GLFW_KEY_5:
-				targetViz = visualizers[4];
-				break;
-			case GLFW_KEY_6:
-				targetViz = visualizers[5];
-				break;
-			case GLFW_KEY_7:
-				targetViz = visualizers[6];
-				break;
-			case GLFW_KEY_8:
-				targetViz = visualizers[7];
-				break;
-			case GLFW_KEY_9:
-				targetViz = visualizers[8];
-				break;
-			case GLFW_KEY_0:
-				targetViz = visualizers[9];
-				break;
-
-			case GLFW_KEY_Q:
-				targetViz = visualizers[10];
-				break;
-			case GLFW_KEY_W:
-				targetViz = visualizers[11];
-				break;
-			case GLFW_KEY_E:
-				targetViz = visualizers[12];
-				break;
-			case GLFW_KEY_R:
-				targetViz = visualizers[13];
-				break;
-			case GLFW_KEY_T:
-				targetViz = visualizers[14];
-				break;
-			case GLFW_KEY_Y:
-				targetViz = visualizers[15];
-				break;
-			case GLFW_KEY_U:
-				targetViz = visualizers[16];
-				break;
-			case GLFW_KEY_I:
-				targetViz = visualizers[17];
-				break;
-			case GLFW_KEY_O:
-				targetViz = visualizers[18];
-				break;
-			case GLFW_KEY_P:
-				targetViz = visualizers[19];
-				break;
-
-			case GLFW_KEY_A:
-				targetViz = visualizers[20];
-				break;
-			case GLFW_KEY_S:
-				targetViz = visualizers[21];
-				break;
-			case GLFW_KEY_D:
-				targetViz = visualizers[22];
-				break;
-			case GLFW_KEY_F:
-				targetViz = visualizers[23];
-				break;
-			case GLFW_KEY_G:
-				targetViz = visualizers[24];
-				break;
-			case GLFW_KEY_H:
-				targetViz = visualizers[25];
-				break;
-			case GLFW_KEY_J:
-				targetViz = visualizers[26];
-				break;
-			case GLFW_KEY_K:
-				targetViz = visualizers[27];
-				break;
-			case GLFW_KEY_L:
-				targetViz = visualizers[28];
-				break;
-			case GLFW_KEY_Z:
-				targetViz = visualizers[29];
-				break;
-			case GLFW_KEY_X:
-				targetViz = visualizers[30];
-				break;
-			case GLFW_KEY_C:
-				targetViz = visualizers[31];
-				break;
-			case GLFW_KEY_V:
-				targetViz = visualizers[32];
-				break;
-			case GLFW_KEY_B:
-				targetViz = visualizers[33];
-				break;
-			case GLFW_KEY_N:
-				targetViz = visualizers[34];
-				break;
-			case GLFW_KEY_M:
-				targetViz = visualizers[35];
-				break;
-			case GLFW_KEY_LEFT_BRACKET:
-				targetViz = visualizers[36];
-				break;
-			case GLFW_KEY_RIGHT_BRACKET:
-				targetViz = visualizers[37];
-				break;
-			case GLFW_KEY_SEMICOLON:
-				targetViz = visualizers[38];
-				break;
-			case GLFW_KEY_APOSTROPHE:
-				targetViz = visualizers[39];
-				break;
-			case GLFW_KEY_MINUS:
-				targetViz = visualizers[40];
-				break;
-			case GLFW_KEY_EQUAL:
-				targetViz = visualizers[41];
-				break;
-			case GLFW_KEY_SPACE:
-				vizRandom();
-				transRandom();
-				manualOverride = false;
-				autoTimer = 0;
-				break;
-			case GLFW_KEY_DOWN:
-				cout << "Low mode" << endl;
-				det = det_low;
-				break;
-			case GLFW_KEY_UP:
-				cout << "High mode" << endl;
-				det = det_high;
-				break;
-
-			}
-
-			if (key != GLFW_KEY_SPACE && targetViz != tempViz) {
-				manualOverride = true;
-				transRandom();
-			}
-		}
-
-		switch (key) {
-			// Alpha setting
-			case GLFW_KEY_PAGE_DOWN:
-			case GLFW_KEY_COMMA:
-				alphaVec = (mods&GLFW_MOD_SHIFT)?4.0 : 1.0;
-				break;
-			case GLFW_KEY_PAGE_UP:
-			case GLFW_KEY_PERIOD:
-				alphaVec = (mods&GLFW_MOD_SHIFT) ? -4.0 : -1.0;
-				break;
-		}
-    }
-
-	if (action == GLFW_RELEASE) {
-		switch (key) {
-			case GLFW_KEY_PAGE_DOWN:
-			case GLFW_KEY_COMMA:
-				if (alphaVec > 0.0) {
-					alphaVec = 0.0;
-				}
-				break;
-			case GLFW_KEY_PAGE_UP:
-			case GLFW_KEY_PERIOD:
-				if (alphaVec < 0.0) {
-					alphaVec = 0.0;
-				}
-				break;
-		}
-	}
+static bool shiftHeld() {
+    return IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
 }
 
+static ShaderViz *vizKey(int key) {
+    switch (key) {
+    case KEY_ONE: return visualizers[0];
+    case KEY_TWO: return visualizers[1];
+    case KEY_THREE: return visualizers[2];
+    case KEY_FOUR: return visualizers[3];
+    case KEY_FIVE: return visualizers[4];
+    case KEY_SIX: return visualizers[5];
+    case KEY_SEVEN: return visualizers[6];
+    case KEY_EIGHT: return visualizers[7];
+    case KEY_NINE: return visualizers[8];
+    case KEY_ZERO: return visualizers[9];
+    case KEY_Q: return visualizers[10];
+    case KEY_W: return visualizers[11];
+    case KEY_E: return visualizers[12];
+    case KEY_R: return visualizers[13];
+    case KEY_T: return visualizers[14];
+    case KEY_Y: return visualizers[15];
+    case KEY_U: return visualizers[16];
+    case KEY_I: return visualizers[17];
+    case KEY_O: return visualizers[18];
+    case KEY_P: return visualizers[19];
+    case KEY_A: return visualizers[20];
+    case KEY_S: return visualizers[21];
+    case KEY_D: return visualizers[22];
+    case KEY_F: return visualizers[23];
+    case KEY_G: return visualizers[24];
+    case KEY_H: return visualizers[25];
+    case KEY_J: return visualizers[26];
+    case KEY_K: return visualizers[27];
+    case KEY_L: return visualizers[28];
+    case KEY_Z: return visualizers[29];
+    case KEY_X: return visualizers[30];
+    case KEY_C: return visualizers[31];
+    case KEY_V: return visualizers[32];
+    case KEY_B: return visualizers[33];
+    case KEY_N: return visualizers[34];
+    case KEY_M: return visualizers[35];
+    case KEY_LEFT_BRACKET: return visualizers[36];
+    case KEY_RIGHT_BRACKET: return visualizers[37];
+    case KEY_SEMICOLON: return visualizers[38];
+    case KEY_APOSTROPHE: return visualizers[39];
+    case KEY_MINUS: return visualizers[40];
+    case KEY_EQUAL: return visualizers[41];
+    default: return NULL;
+    }
+}
 
+static const int vizKeys[] = {
+    KEY_ONE, KEY_TWO, KEY_THREE, KEY_FOUR, KEY_FIVE,
+    KEY_SIX, KEY_SEVEN, KEY_EIGHT, KEY_NINE, KEY_ZERO,
+    KEY_Q, KEY_W, KEY_E, KEY_R, KEY_T, KEY_Y, KEY_U,
+    KEY_I, KEY_O, KEY_P, KEY_A, KEY_S, KEY_D, KEY_F,
+    KEY_G, KEY_H, KEY_J, KEY_K, KEY_L, KEY_Z, KEY_X,
+    KEY_C, KEY_V, KEY_B, KEY_N, KEY_M,
+    KEY_LEFT_BRACKET, KEY_RIGHT_BRACKET,
+    KEY_SEMICOLON, KEY_APOSTROPHE, KEY_MINUS, KEY_EQUAL
+};
+
+static void pollKeys() {
+    if (shiftHeld()) {
+        bool doChange = false;
+        thisImage = -1;
+        if (IsKeyPressed(KEY_ONE)) { overlayImage->setOverlayTexture(overlays[0]); thisImage = 0; doChange = true; }
+        if (IsKeyPressed(KEY_TWO)) { overlayImage->setOverlayTexture(overlays[1]); thisImage = 1; doChange = true; }
+        if (IsKeyPressed(KEY_THREE)) { overlayImage->setOverlayTexture(overlays[2]); thisImage = 2; doChange = true; }
+        if (IsKeyPressed(KEY_FOUR)) { overlayImage->setOverlayTexture(overlays[3]); thisImage = 3; doChange = true; }
+        if (IsKeyPressed(KEY_FIVE)) { overlayImage->setOverlayTexture(overlays[4]); thisImage = 4; doChange = true; }
+        if (IsKeyPressed(KEY_SIX)) { overlayImage->setOverlayTexture(overlays[5]); thisImage = 5; doChange = true; }
+        if (IsKeyPressed(KEY_ZERO)) {
+            overlayEnabled = !overlayEnabled;
+            overlayDelta = 0;
+        }
+
+        if (doChange && thisImage == lastImage) {
+            overlayDelta = overlayDelta ? -overlayDelta : -1.0f;
+        }
+
+        if (doChange && !overlayEnabled) {
+            overlayEnabled = true;
+            overlayDelta = -1.0f;
+        }
+
+        if (thisImage != -1) lastImage = thisImage;
+    } else {
+        ShaderViz *tempViz = targetViz;
+        for (int k : vizKeys) {
+            if (IsKeyPressed(k)) {
+                targetViz = vizKey(k);
+                break;
+            }
+        }
+        if (IsKeyPressed(KEY_SPACE)) {
+            vizRandom();
+            transRandom();
+            manualOverride = false;
+            autoTimer = 0;
+        }
+        if (IsKeyPressed(KEY_DOWN)) {
+            printf("Low mode\n");
+            det = det_low;
+        }
+        if (IsKeyPressed(KEY_UP)) {
+            printf("High mode\n");
+            det = det_high;
+        }
+
+        if (targetViz != tempViz) {
+            manualOverride = true;
+            transRandom();
+        }
+    }
+}
+
+struct SetupChoice {
+    int monitor = 0;
+    bool fullscreen = false;
+    int width = 1280;
+    int height = 768;
+    int resPreset = 4;
+    unsigned int audioDevice = 0;
+    int audioIndex = 0;
+};
+
+static const int resPresets[][2] = {
+    { 1920, 1080 },
+    { 1600, 900 },
+    { 1366, 768 },
+    { 1280, 720 },
+    { 1280, 768 },
+    { 1024, 768 },
+    { 800, 600 },
+};
+static const int numResPresets = 7;
+
+static string shortName(const string &name, size_t maxLen) {
+    if (name.size() <= maxLen) {
+        return name;
+    }
+    return name.substr(0, maxLen - 3) + "...";
+}
+
+static bool uiButton(Rectangle r, const char *label, bool selected) {
+    Vector2 mouse = GetMousePosition();
+    bool hover = CheckCollisionPointRec(mouse, r);
+    bool clicked = hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    Color fill = selected ? SKYBLUE : (hover ? GRAY : DARKGRAY);
+    DrawRectangleRec(r, fill);
+    DrawRectangleLinesEx(r, 1, LIGHTGRAY);
+    Color textColor = selected ? BLACK : RAYWHITE;
+    DrawText(label, (int)r.x + 8, (int)(r.y + r.height / 2 - 10), 20, textColor);
+    return clicked;
+}
+
+static bool runSetupDialog(SetupChoice &choice, const vector<AudioDevInfo> &audioDevs) {
+    const int dlgW = 660;
+    const int dlgH = 720;
+    InitWindow(dlgW, dlgH, "ShaderFX Setup");
+    SetTargetFPS(60);
+
+    int monitorCount = GetMonitorCount();
+    if (choice.monitor < 0 || choice.monitor >= monitorCount) {
+        choice.monitor = 0;
+    }
+    if (!audioDevs.empty() && (choice.audioIndex < 0 || choice.audioIndex >= (int)audioDevs.size())) {
+        choice.audioIndex = 0;
+        choice.audioDevice = audioDevs[0].id;
+    }
+
+    bool done = false;
+    while (!WindowShouldClose() && !done) {
+        if (IsKeyPressed(KEY_ENTER)) {
+            done = true;
+        }
+
+        float y = 12;
+        BeginDrawing();
+        ClearBackground(BLACK);
+
+        DrawText("ShaderFX Setup", 16, (int)y, 28, RAYWHITE);
+        y += 40;
+
+        DrawText("Display monitor:", 16, (int)y, 20, LIGHTGRAY);
+        y += 26;
+        for (int m = 0; m < monitorCount && m < 4; m++) {
+            char label[160];
+            snprintf(label, sizeof(label), "%d: %s (%dx%d)", m + 1,
+                shortName(GetMonitorName(m), 34).c_str(),
+                GetMonitorWidth(m), GetMonitorHeight(m));
+            if (uiButton({ 16, y, dlgW - 32, 30 }, label, m == choice.monitor)) {
+                choice.monitor = m;
+            }
+            y += 36;
+        }
+
+        DrawText("Mode:", 16, (int)y, 20, LIGHTGRAY);
+        y += 26;
+        if (uiButton({ 16, y, (dlgW - 40) / 2, 30 }, "Windowed", !choice.fullscreen)) {
+            choice.fullscreen = false;
+        }
+        if (uiButton({ 16 + (dlgW - 40) / 2 + 8, y, (dlgW - 40) / 2, 30 }, "Fullscreen", choice.fullscreen)) {
+            choice.fullscreen = true;
+        }
+        y += 36;
+
+        if (choice.fullscreen) {
+            char label[128];
+            snprintf(label, sizeof(label), "Fullscreen uses monitor native: %dx%d",
+                GetMonitorWidth(choice.monitor), GetMonitorHeight(choice.monitor));
+            DrawText(label, 16, (int)y, 20, GRAY);
+            y += 28;
+        } else {
+            DrawText("Resolution:", 16, (int)y, 20, LIGHTGRAY);
+            y += 26;
+            for (int i = 0; i < numResPresets; i++) {
+                char label[32];
+                snprintf(label, sizeof(label), "%dx%d", resPresets[i][0], resPresets[i][1]);
+                float bw = (dlgW - 32 - 3 * 8) / 4;
+                float bx = 16 + (i % 4) * (bw + 8);
+                float by = y + (i / 4) * 36;
+                if (uiButton({ bx, by, bw, 30 }, label, i == choice.resPreset)) {
+                    choice.resPreset = i;
+                    choice.width = resPresets[i][0];
+                    choice.height = resPresets[i][1];
+                }
+            }
+            y += ((numResPresets + 3) / 4) * 36 + 6;
+        }
+
+        DrawText("Audio input:", 16, (int)y, 20, LIGHTGRAY);
+        y += 26;
+        if (audioDevs.empty()) {
+            DrawText("No input devices found.", 16, (int)y, 20, RED);
+            y += 30;
+        }
+        int shown = 0;
+        for (int i = 0; i < (int)audioDevs.size() && shown < 6; i++, shown++) {
+            char label[160];
+            snprintf(label, sizeof(label), "%s (%uch)", shortName(audioDevs[i].name, 40).c_str(), audioDevs[i].inChannels);
+            if (uiButton({ 16, y, dlgW - 32, 30 }, label, i == choice.audioIndex)) {
+                choice.audioIndex = i;
+                choice.audioDevice = audioDevs[i].id;
+            }
+            y += 36;
+        }
+        if ((int)audioDevs.size() > shown) {
+            DrawText(TextFormat("+ %d more (showing first %d)", (int)audioDevs.size() - shown, shown), 16, (int)y, 20, GRAY);
+            y += 28;
+        }
+
+        y += 10;
+        if (uiButton({ 16, dlgH - 52, dlgW - 32, 36 }, "Start", false)) {
+            done = true;
+        }
+        DrawText("Enter = Start    Esc = Quit", 16, dlgH - 78, 20, GRAY);
+
+        EndDrawing();
+    }
+
+    bool quit = WindowShouldClose() && !done;
+    if (quit) {
+        CloseWindow();
+    }
+    return !quit;
+}
+
+static void drawVizInto(RenderTexture2D rt, ShaderViz *viz, float t, float dt) {
+    viz->updateVariables(t, dt, sample_data, vu->vu_levels, contest);
+    BeginTextureMode(rt);
+    ClearBackground(BLANK);
+    viz->display(VIZ_WIDTH, VIZ_HEIGHT);
+    EndTextureMode();
+}
 
 int main(int argc, char * argv[])
 {
+    int monitorNum = 0;
+    int ovrWidth = 0;
+    int ovrHeight = 0;
 
-	int doFullscreen;
-	int ovrWidth = 0;
-	int ovrHeight = 0;
-	int monitorNum = 0;
-
-
-	if (argc > 1) {
-		if (argc >= 2) {
-			sscanf(argv[1], "%d", &monitorNum);
-		}
-		if (argc >= 4) {
-			sscanf(argv[2], "%d", &ovrWidth);
-			sscanf(argv[3], "%d", &ovrHeight);
-		}
-		if (argc >= 5) {
-			sscanf(argv[4], "%f", &autoTimerLimit);
-		}
-	}
-
-    if (!glfwInit()) {
-        return -1;
+    if (argc > 1) {
+        if (argc >= 2) {
+            sscanf(argv[1], "%d", &monitorNum);
+        }
+        if (argc >= 4) {
+            sscanf(argv[2], "%d", &ovrWidth);
+            sscanf(argv[3], "%d", &ovrHeight);
+        }
+        if (argc >= 5) {
+            sscanf(argv[4], "%f", &autoTimerLimit);
+        }
     }
 
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-    
-	GLFWmonitor **monitors;
-	int numMonitors;
-	monitors = glfwGetMonitors(&numMonitors);
-	GLFWwindow *window;
-
-	if (ovrWidth && ovrHeight) {
-		VIZ_WIDTH = ovrWidth;
-		VIZ_HEIGHT = ovrHeight;
-	}
-
-	if (monitorNum > 0 && monitorNum <= numMonitors) {
-		window = glfwCreateWindow(VIZ_WIDTH, VIZ_HEIGHT, "BeatDetektor ShaderFX", monitors[monitorNum-1], NULL);
-	}
-	else {
-		window = glfwCreateWindow(VIZ_WIDTH, VIZ_HEIGHT, "BeatDetektor ShaderFX", NULL, NULL);
-	}
-    //GLFWwindow *window = glfwCreateWindow(VIZ_WIDTH, VIZ_HEIGHT, "BeatDetektor ShaderFX", glfwGetPrimaryMonitor(), NULL);
-//	GLFWwindow *window = glfwCreateWindow(VIZ_WIDTH, VIZ_HEIGHT, "BeatDetektor ShaderFX", monitors[1], NULL);
-
-    if (!window)
-    {
-        glfwTerminate();
-        return -1;
+    vector<AudioDevInfo> audioDevs = listInputDevices();
+    printf("Available input devices are:\n");
+    for (auto &d : audioDevs) {
+        printf("**%s** (%u in)\n", d.name.c_str(), d.inChannels);
     }
 
+    SetupChoice choice;
+    if (monitorNum > 0) {
+        choice.monitor = monitorNum - 1;
+    }
+    if (ovrWidth && ovrHeight) {
+        choice.width = ovrWidth;
+        choice.height = ovrHeight;
+        choice.resPreset = -1;
+        for (int i = 0; i < numResPresets; i++) {
+            if (resPresets[i][0] == ovrWidth && resPresets[i][1] == ovrHeight) {
+                choice.resPreset = i;
+                break;
+            }
+        }
+    }
+    if (!audioDevs.empty()) {
+        choice.audioDevice = audioDevs[0].id;
+        for (int i = 0; i < (int)audioDevs.size(); i++) {
+            if (audioDevs[i].id == (unsigned int)RtAudio().getDefaultInputDevice()) {
+                choice.audioIndex = i;
+                choice.audioDevice = audioDevs[i].id;
+                break;
+            }
+        }
+    }
 
-    glfwMakeContextCurrent(window);
-    
-#ifdef _WIN32
-	glewExperimental = true;
-	GLenum err = glewInit();
-	if (GLEW_OK != err)
-	{
-		fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
-		return -1;
-	}
-#endif
+    if (!runSetupDialog(choice, audioDevs)) {
+        return 0;
+    }
 
+    if (choice.fullscreen) {
+        int monW = GetMonitorWidth(choice.monitor);
+        int monH = GetMonitorHeight(choice.monitor);
+        SetWindowSize(monW, monH);
+        SetWindowMonitor(choice.monitor);
+        if (!IsWindowFullscreen()) {
+            ToggleFullscreen();
+        }
+        VIZ_WIDTH = GetScreenWidth();
+        VIZ_HEIGHT = GetScreenHeight();
+    } else {
+        if (IsWindowFullscreen()) {
+            ToggleFullscreen();
+        }
+        SetWindowSize(choice.width, choice.height);
+        SetWindowMonitor(choice.monitor);
+        VIZ_WIDTH = choice.width;
+        VIZ_HEIGHT = choice.height;
+    }
+    SetWindowTitle("BeatDetektor ShaderFX");
 
-    glfwSetKeyCallback(window, key_callback);
-    
     initBD();
-    
-    visTimer.start();
-    fpsTimer.start();
-    
 
-    
     ShaderViz vizRgbFlares("shaders/vertex_common.vs", "shaders/rgb_flares_in_tunnel.fs");
-	ShaderViz sparklingSine("shaders/vertex_common.vs", "shaders/sparkling_sine_wave.fs");
-	ShaderViz sparklingBlocks("shaders/vertex_common.vs", "shaders/sparkling_blocks.fs");
-	ShaderViz flareWave("shaders/vertex_common.vs", "shaders/flare_wave.fs");
-	ShaderViz rbCrawl("shaders/vertex_common.vs", "shaders/red_blue_crawl_pattern.fs");
+    ShaderViz sparklingSine("shaders/vertex_common.vs", "shaders/sparkling_sine_wave.fs");
+    ShaderViz sparklingBlocks("shaders/vertex_common.vs", "shaders/sparkling_blocks.fs");
+    ShaderViz flareWave("shaders/vertex_common.vs", "shaders/flare_wave.fs");
+    ShaderViz rbCrawl("shaders/vertex_common.vs", "shaders/red_blue_crawl_pattern.fs");
     ShaderViz rmTunnel("shaders/vertex_common.vs", "shaders/raymarch_tunnel.fs");
     ShaderViz discoFloor("shaders/vertex_common.vs", "shaders/discofloor_ceiling.fs");
     ShaderViz flareTunnel("shaders/vertex_common.vs", "shaders/flare_tunnel.fs");
-//    ShaderViz colorSpiral("shaders/vertex_common.vs","shaders/color_spiral_complex.fs");
     ShaderViz mandelBlob("shaders/vertex_common.vs","shaders/raymarch_fractal3d.fs");
     ShaderViz lineZoom("shaders/vertex_common.vs","shaders/raymarch_lines_zoom.fs");
-	ShaderViz hexField("shaders/vertex_common.vs", "shaders/hex_twist_field.fs");
-	ShaderViz discoBall("shaders/vertex_common.vs", "shaders/discoball.fs");
-	ShaderViz cubeArray("shaders/vertex_common.vs", "shaders/cube_array.fs");
-	ShaderViz planeDeformFly("shaders/vertex_common.vs", "shaders/planed_fly.fs");
-	ShaderViz planeDeformReliefTunnel("shaders/vertex_common.vs", "shaders/planed_relief_tun.fs");
-	ShaderViz planeDeformSquareTunnel("shaders/vertex_common.vs", "shaders/planed_square_tun.fs");
-	ShaderViz hexTunnel("shaders/vertex_common.vs", "shaders/hex_tunnel.fs");
-	ShaderViz cubeScape("shaders/vertex_common.vs", "shaders/rm_cubescape.fs");
-	ShaderViz inversionMachine("shaders/vertex_common.vs", "shaders/inversion_machine.fs");
-	ShaderViz mengerJourney("shaders/vertex_common.vs", "shaders/menger_journey.fs");
-	ShaderViz aLotOfSpheres("shaders/vertex_common.vs", "shaders/a_lot_of_spheres.fs");
-	ShaderViz fractalGears("shaders/vertex_common.vs", "shaders/fractal_gears.fs");
-	ShaderViz metaBalls("shaders/vertex_common.vs", "shaders/metaballs.fs");
-	ShaderViz particleTracing("shaders/vertex_common.vs", "shaders/particle_tracing.fs");
-	ShaderViz flyingCubes("shaders/vertex_common.vs", "shaders/flying_cubes.fs");
-	ShaderViz spaceShip("shaders/vertex_common.vs", "shaders/spaceship.fs");
-	ShaderViz spaceRings("shaders/vertex_common.vs", "shaders/space_rings.fs");
-	ShaderViz hologram("shaders/vertex_common.vs", "shaders/hologram.fs");
-	ShaderViz musicBall("shaders/vertex_common.vs", "shaders/music_ball.fs");
-	ShaderViz ledSpectrum("shaders/vertex_common.vs", "shaders/led_spectrum.fs");
-	ShaderViz kifs2D("shaders/vertex_common.vs", "shaders/2dkifs.fs");
-	ShaderViz planeDTunEffect("shaders/vertex_common.vs", "shaders/planed_tunnel_effect.fs");
-	ShaderViz noxiousBox("shaders/vertex_common.vs", "shaders/noxious_box.fs");
-	ShaderViz waveFloor("shaders/vertex_common.vs", "shaders/wave_floor.fs");
-	ShaderViz hexField2("shaders/vertex_common.vs", "shaders/hex_field.fs");
-	ShaderViz spaceRace("shaders/vertex_common.vs", "shaders/space_race.fs");
+    ShaderViz hexField("shaders/vertex_common.vs", "shaders/hex_twist_field.fs");
+    ShaderViz discoBall("shaders/vertex_common.vs", "shaders/discoball.fs");
+    ShaderViz cubeArray("shaders/vertex_common.vs", "shaders/cube_array.fs");
+    ShaderViz planeDeformFly("shaders/vertex_common.vs", "shaders/planed_fly.fs");
+    ShaderViz planeDeformReliefTunnel("shaders/vertex_common.vs", "shaders/planed_relief_tun.fs");
+    ShaderViz planeDeformSquareTunnel("shaders/vertex_common.vs", "shaders/planed_square_tun.fs");
+    ShaderViz hexTunnel("shaders/vertex_common.vs", "shaders/hex_tunnel.fs");
+    ShaderViz cubeScape("shaders/vertex_common.vs", "shaders/rm_cubescape.fs");
+    ShaderViz inversionMachine("shaders/vertex_common.vs", "shaders/inversion_machine.fs");
+    ShaderViz mengerJourney("shaders/vertex_common.vs", "shaders/menger_journey.fs");
+    ShaderViz aLotOfSpheres("shaders/vertex_common.vs", "shaders/a_lot_of_spheres.fs");
+    ShaderViz fractalGears("shaders/vertex_common.vs", "shaders/fractal_gears.fs");
+    ShaderViz metaBalls("shaders/vertex_common.vs", "shaders/metaballs.fs");
+    ShaderViz particleTracing("shaders/vertex_common.vs", "shaders/particle_tracing.fs");
+    ShaderViz flyingCubes("shaders/vertex_common.vs", "shaders/flying_cubes.fs");
+    ShaderViz spaceShip("shaders/vertex_common.vs", "shaders/spaceship.fs");
+    ShaderViz spaceRings("shaders/vertex_common.vs", "shaders/space_rings.fs");
+    ShaderViz hologram("shaders/vertex_common.vs", "shaders/hologram.fs");
+    ShaderViz musicBall("shaders/vertex_common.vs", "shaders/music_ball.fs");
+    ShaderViz ledSpectrum("shaders/vertex_common.vs", "shaders/led_spectrum.fs");
+    ShaderViz kifs2D("shaders/vertex_common.vs", "shaders/2dkifs.fs");
+    ShaderViz planeDTunEffect("shaders/vertex_common.vs", "shaders/planed_tunnel_effect.fs");
+    ShaderViz noxiousBox("shaders/vertex_common.vs", "shaders/noxious_box.fs");
+    ShaderViz waveFloor("shaders/vertex_common.vs", "shaders/wave_floor.fs");
+    ShaderViz hexField2("shaders/vertex_common.vs", "shaders/hex_field.fs");
+    ShaderViz spaceRace("shaders/vertex_common.vs", "shaders/space_race.fs");
 
-	Texture *tex_noise = new Texture(); 
-	tex_noise->loadPNG("png/tex_noise1.png");
-	Texture *tex_noise2 = new Texture();
-	tex_noise2->loadPNG("png/tex_noise2.png");
-	Texture *tex_tex06 = new Texture();
-	tex_tex06->loadPNG("png/tex_tex06.png");
-	Texture *tex_tex07 = new Texture();
-	tex_tex07->loadPNG("png/tex_tex07.png");
+    Texture2D tex_noise = LoadTexture("png/tex_noise1.png");
+    Texture2D tex_noise2 = LoadTexture("png/tex_noise2.png");
+    Texture2D tex_tex06 = LoadTexture("png/tex_tex06.png");
+    Texture2D tex_tex07 = LoadTexture("png/tex_tex07.png");
 
+    ShaderViz truchetTentacles("shaders/vertex_common.vs", "shaders/truchet_tentacles.fs");
+    ShaderViz circlePattern("shaders/vertex_common.vs", "shaders/circle_pattern.fs");
+    circlePattern.setTex0Texture(tex_noise);
 
+    ShaderViz fireShader("shaders/vertex_common.vs", "shaders/fire.fs");
+    ShaderViz dubstepMyAss("shaders/vertex_common.vs", "shaders/dubstepmyass.fs");
 
-	ShaderViz truchetTentacles("shaders/vertex_common.vs", "shaders/truchet_tentacles.fs");
-	ShaderViz circlePattern("shaders/vertex_common.vs", "shaders/circle_pattern.fs");
-	circlePattern.setTex0Texture(tex_noise);
+    ShaderViz voxelEdges("shaders/vertex_common.vs", "shaders/voxel_edges.fs");
+    voxelEdges.setTex0Texture(tex_noise2);
+    voxelEdges.setTex1Texture(tex_tex07);
+    voxelEdges.setTex2Texture(tex_tex06);
 
-	ShaderViz fireShader("shaders/vertex_common.vs", "shaders/fire.fs");
-	ShaderViz dubstepMyAss("shaders/vertex_common.vs", "shaders/dubstepmyass.fs");
+    ShaderViz noiseBlur("shaders/vertex_common.vs", "shaders/noise_blur.fs");
 
-	ShaderViz voxelEdges("shaders/vertex_common.vs", "shaders/voxel_edges.fs");
-	voxelEdges.setTex0Texture(tex_noise2);
-	voxelEdges.setTex1Texture(tex_tex07);
-	voxelEdges.setTex2Texture(tex_tex06);
+    overlayImage = new ShaderViz("shaders/vertex_common.vs", "shaders/overlay_image.fs");
 
+    loadOverlays();
 
-//	ShaderViz shaderFlames("shaders/vertex_common.vs", "shaders/flames.fs");
-//	shaderFlames.setTex0Texture(tex_noise2);
+    if (!audioDevs.empty()) {
+        if (!openAudio(choice.audioDevice)) {
+            printf("Continuing without audio input.\n");
+        }
+    } else {
+        printf("No audio input devices, continuing without audio.\n");
+    }
+    sample_data.assign(BUF, 0.0f);
+    fft_data.assign(BUF, 0.0f);
 
-	ShaderViz noiseBlur("shaders/vertex_common.vs", "shaders/noise_blur.fs");
-
-	//ShaderViz shaderWaves("shaders/vertex_common.vs", "shaders/waves.fs");
-
-	overlayImage = new ShaderViz("shaders/vertex_common.vs", "shaders/overlay_image.fs");
-
-	loadOverlays();
-
-	if (!initAudio()) {
-		return -1;
-	}
-
-//	ShaderViz roadToHell("shaders/vertex_common.vs", "shaders/road_to_hell.fs");
-
-//    ShaderViz torusSwirl("shaders/vertex_common.vs", "shaders/torus_tunnel_swirl.fs");
-//    ShaderViz rmBoxFloor("shaders/vertex_common.vs", "shaders/rm_box_floor.fs");
-//    ShaderViz cubeMatrix("shaders/vertex_common.vs", "shaders/rm_cube_matrix.fs");
-//    ShaderViz rmCorridorBalls("shaders/vertex_common.vs", "shaders/rt_balls_corridor.fs");
-
-    
-    //            vizShader.loadTextFile("shaders/vertex_common.vs", "shaders/greyscale_cube_matrix.fs");
-    //            vizShader.loadTextFile("shaders/vertex_common.vs", "shaders/raymarch_clod.fs");
-    //            vizShader.loadTextFile("shaders/vertex_common.vs", "shaders/binary_tunnel.fs");
-    
     visualizers.push_back(&vizRgbFlares);
-	visualizers.push_back(&sparklingSine);
-	visualizers.push_back(&sparklingBlocks);
-	visualizers.push_back(&flareWave);
-	visualizers.push_back(&rbCrawl);
+    visualizers.push_back(&sparklingSine);
+    visualizers.push_back(&sparklingBlocks);
+    visualizers.push_back(&flareWave);
+    visualizers.push_back(&rbCrawl);
     visualizers.push_back(&rmTunnel);
     visualizers.push_back(&discoFloor);
     visualizers.push_back(&flareTunnel);
-//    visualizers.push_back(&colorSpiral);
     visualizers.push_back(&mandelBlob);
     visualizers.push_back(&lineZoom);
-	visualizers.push_back(&hexField);
-	visualizers.push_back(&discoBall);
-	visualizers.push_back(&cubeArray);
-	visualizers.push_back(&planeDeformFly);
-	visualizers.push_back(&planeDeformReliefTunnel);
-	visualizers.push_back(&planeDeformSquareTunnel);
-	visualizers.push_back(&hexTunnel);
-	visualizers.push_back(&cubeScape);
-	visualizers.push_back(&aLotOfSpheres);
-	visualizers.push_back(&fractalGears);
-	visualizers.push_back(&inversionMachine);
-	visualizers.push_back(&mengerJourney);
-	visualizers.push_back(&metaBalls);
-	visualizers.push_back(&particleTracing);
-	visualizers.push_back(&flyingCubes);
-	visualizers.push_back(&spaceShip);
-	visualizers.push_back(&spaceRings);
-	visualizers.push_back(&hologram);
-	visualizers.push_back(&musicBall);
-	visualizers.push_back(&ledSpectrum);
-	visualizers.push_back(&kifs2D);
-	visualizers.push_back(&planeDTunEffect);
-	visualizers.push_back(&noxiousBox);
-	visualizers.push_back(&waveFloor);
-	visualizers.push_back(&hexField2);
-	visualizers.push_back(&spaceRace);
-	visualizers.push_back(&truchetTentacles);
-	visualizers.push_back(&circlePattern);
-	visualizers.push_back(&fireShader);
-	visualizers.push_back(&dubstepMyAss);
-	visualizers.push_back(&voxelEdges);
-	visualizers.push_back(&noiseBlur);
+    visualizers.push_back(&hexField);
+    visualizers.push_back(&discoBall);
+    visualizers.push_back(&cubeArray);
+    visualizers.push_back(&planeDeformFly);
+    visualizers.push_back(&planeDeformReliefTunnel);
+    visualizers.push_back(&planeDeformSquareTunnel);
+    visualizers.push_back(&hexTunnel);
+    visualizers.push_back(&cubeScape);
+    visualizers.push_back(&aLotOfSpheres);
+    visualizers.push_back(&fractalGears);
+    visualizers.push_back(&inversionMachine);
+    visualizers.push_back(&mengerJourney);
+    visualizers.push_back(&metaBalls);
+    visualizers.push_back(&particleTracing);
+    visualizers.push_back(&flyingCubes);
+    visualizers.push_back(&spaceShip);
+    visualizers.push_back(&spaceRings);
+    visualizers.push_back(&hologram);
+    visualizers.push_back(&musicBall);
+    visualizers.push_back(&ledSpectrum);
+    visualizers.push_back(&kifs2D);
+    visualizers.push_back(&planeDTunEffect);
+    visualizers.push_back(&noxiousBox);
+    visualizers.push_back(&waveFloor);
+    visualizers.push_back(&hexField2);
+    visualizers.push_back(&spaceRace);
+    visualizers.push_back(&truchetTentacles);
+    visualizers.push_back(&circlePattern);
+    visualizers.push_back(&fireShader);
+    visualizers.push_back(&dubstepMyAss);
+    visualizers.push_back(&voxelEdges);
+    visualizers.push_back(&noiseBlur);
 
-	
-//    visualizers.push_back(&torusSwirl);
-//    visualizers.push_back(&rmCorridorBalls);
-//    visualizers.push_back(&cubeMatrix);
-//    visualizers.push_back(&rmBoxFloor);
-    
-	//currentViz = &spaceRace;
+    srand((unsigned int)time(NULL));
+    vizRandom();
+    transRandom();
 
-	srand(time(NULL));
-	vizRandom();
-	transRandom();
+    RenderTexture2D rtCurrent = LoadRenderTexture(VIZ_WIDTH, VIZ_HEIGHT);
+    RenderTexture2D rtTarget = LoadRenderTexture(VIZ_WIDTH, VIZ_HEIGHT);
+    Rectangle rtSource = { 0, 0, (float)VIZ_WIDTH, -(float)VIZ_HEIGHT };
+    Rectangle rtDest = { 0, 0, (float)VIZ_WIDTH, (float)VIZ_HEIGHT };
+    Vector2 rtOrigin = { 0, 0 };
 
-//	targetViz = &shaderWaves; manualOverride = true;
+    SetTargetFPS(60);
 
-    float frameSlice = 0.0f;
-    
-    while (!glfwWindowShouldClose(window))
+    while (!WindowShouldClose())
     {
-        fpsTimer.update();
-        
-        frameSlice += fpsTimer.lastUpdateSeconds();
-        
-        if (frameSlice > 0.5f) {
-            frameSlice = 0.0;
+        float dt = GetFrameTime();
+        float t = (float)GetTime();
+
+        captureAudio();
+        processBD(t, dt);
+
+        pollKeys();
+
+        float alphaDir = 0.0f;
+        if (IsKeyDown(KEY_PAGE_DOWN) || IsKeyDown(KEY_COMMA)) {
+            alphaDir = shiftHeld() ? 4.0f : 1.0f;
+        }
+        if (IsKeyDown(KEY_PAGE_UP) || IsKeyDown(KEY_PERIOD)) {
+            alphaDir = shiftHeld() ? -4.0f : -1.0f;
+        }
+        if (alphaDir != 0.0f) {
+            alphaVal += alphaDir*dt*0.1f;
+            if (alphaVal > 1.0f) {
+                alphaVal = 1.0f;
+            }
+            if (alphaVal < 0.05f) {
+                alphaVal = 0.05f;
+            }
+            printf("%f\n", alphaVal);
         }
 
-
-        if (frameSlice >= 1.0f/60.0f) {
-			visTimer.update();
-			captureAudio();
-
-            processBD();
-
-			if (alphaVec) {
-				alphaVal += alphaVec*visTimer.lastUpdateSeconds()*0.1;
-				if (alphaVal > 1.0) {
-					alphaVal = 1.0;
-				}
-				if (alphaVal < 0.05) {
-					alphaVal = 0.05;
-				}
-				cout << alphaVal << endl;
-			}
-
-
-//			alphaVal = 1.0 - vu->vu_levels[0];
-
-
-			glEnable(GL_BLEND);
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-
-			if (currentViz != targetViz) {
-				in_transition = true;
-				transition_timer += visTimer.lastUpdateSeconds();
-				if (transition_timer > 1.0) {
-					in_transition = false;
-					transition_timer = 0;
-					currentViz = targetViz;
-				}
-			}
-
-
-			glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
-			glClear(GL_DEPTH_BUFFER_BIT);
-
-			switch (trans_type) {
-			case TRANS_WIPERIGHT:
-				glViewport((transition_timer*VIZ_WIDTH), 0, VIZ_WIDTH, VIZ_HEIGHT);
-				break;
-			case TRANS_WIPELEFT:
-				glViewport(-(transition_timer*VIZ_WIDTH), 0, VIZ_WIDTH, VIZ_HEIGHT);
-				break;
-			case TRANS_WIPEUP:
-				glViewport(0, -(transition_timer*VIZ_HEIGHT), VIZ_WIDTH, VIZ_HEIGHT);
-				break;
-			case TRANS_WIPEDOWN:
-				glViewport(0, (transition_timer*VIZ_HEIGHT), VIZ_WIDTH, VIZ_HEIGHT);
-				break;
-			default:
-				glViewport(0, 0, VIZ_WIDTH, VIZ_HEIGHT);
-			}
-			
-
-			if (in_transition) {
-				currentViz->updateVariables(visTimer.getSeconds(), sample_data, vu->vu_levels, contest);
-
-//				if (trans_type == TRANS_CROSSFADE) {
-				currentViz->setBlendAlpha((1.0 - transition_timer)*alphaVal);
-//				}
-//				else {
-//					currentViz->setBlendAlpha(alphaVal);
-//				}
-
-				currentViz->display();
-
-				glClear(GL_DEPTH_BUFFER_BIT);
-
-				switch (trans_type) {
-				case TRANS_WIPERIGHT:
-					glViewport(-VIZ_WIDTH + (transition_timer*VIZ_WIDTH), 0, VIZ_WIDTH, VIZ_HEIGHT);
-					break;
-				case TRANS_WIPELEFT:
-					glViewport(VIZ_WIDTH - (transition_timer*VIZ_WIDTH), 0, VIZ_WIDTH, VIZ_HEIGHT);
-					break;
-				case TRANS_WIPEUP:
-					glViewport(0, VIZ_HEIGHT - (transition_timer*VIZ_HEIGHT), VIZ_WIDTH, VIZ_HEIGHT);
-					break;
-				case TRANS_WIPEDOWN:
-					glViewport(0, -VIZ_HEIGHT + (transition_timer*VIZ_HEIGHT), VIZ_WIDTH, VIZ_HEIGHT);
-					break;
-				case TRANS_ZOOMIN:
-					glViewport(VIZ_WIDTH / 2 - (transition_timer*VIZ_WIDTH) / 2, VIZ_HEIGHT / 2 - (transition_timer*VIZ_HEIGHT) / 2, transition_timer*VIZ_WIDTH, transition_timer*VIZ_HEIGHT);
-					break;
-				default:
-					glViewport(0, 0, VIZ_WIDTH, VIZ_HEIGHT);
-				}
-
-				targetViz->updateVariables(visTimer.getSeconds(), sample_data, vu->vu_levels, contest);
-
-//				if (trans_type == TRANS_CROSSFADE) {
-				targetViz->setBlendAlpha(alphaVal*transition_timer);
-//				}
-//				else {
-//					targetViz->setBlendAlpha(alphaVal);
-//				}
-
-				targetViz->display();
-			}
-			else {
-				currentViz->updateVariables(visTimer.getSeconds(), sample_data, vu->vu_levels, contest);
-				currentViz->setBlendAlpha(alphaVal);
-				currentViz->display();
-			}
-            
-
-
-
-
-			if (overlayDelta) {
-				if (overlayEnabled) {
-					overlayAlpha += overlayDelta * visTimer.lastUpdateSeconds();
-				}
-				
-				if (overlayAlpha < -1.0) {
-					overlayAlpha = -1.0;
-				}
-				else if (overlayAlpha > 1.0) {
-					overlayAlpha = 1.0;
-				}
-				
-			}
-			else if (overlayAlpha) {
-				overlayAlpha -= overlayAlpha * visTimer.lastUpdateSeconds();
-				if (fabs(overlayAlpha) < 0.01) {
-					overlayAlpha = 0.0;
-				}
-			}
-
-			if (overlayEnabled || overlayAlpha != 0.0) {
-				overlayImage->setBlendAlpha(overlayAlpha);
-				overlayImage->updateVariables(visTimer.getSeconds(), sample_data, vu->vu_levels, contest);
-
-				glViewport(0, 0, VIZ_WIDTH, VIZ_HEIGHT);
-				glClear(GL_DEPTH_BUFFER_BIT);
-
-				overlayImage->display();
-			}
-
-            glfwSwapBuffers(window);
-            frameSlice = 0.0f;
-
-			if (!in_transition) autoTimer += visTimer.lastUpdateSeconds();
-			if (autoTimer > autoTimerLimit && !manualOverride) {
-				autoTimer = 0;
-				vizRandom();
-			}
-
-			if (!manualOverride) {
-				alphaVal = 1.0+ (sin(visTimer.getSeconds()*0.115+50.0) + cos(visTimer.getSeconds()*0.120+200.0) - sin(100.0+visTimer.getSeconds()*0.132))/2.0;
-				if (alphaVal < 0.20) {
-					alphaVal = 0.20;
-				}
-				//cout << alphaVal << endl;
-			}
-
+        if (currentViz != targetViz) {
+            in_transition = true;
+            transition_timer += dt;
+            if (transition_timer > 1.0f) {
+                in_transition = false;
+                transition_timer = 0;
+                currentViz = targetViz;
+            }
         }
-        
-        glfwPollEvents();
+
+        if (in_transition) {
+            currentViz->setBlendAlpha((1.0f - transition_timer)*alphaVal);
+            drawVizInto(rtCurrent, currentViz, t, dt);
+
+            targetViz->setBlendAlpha(alphaVal*transition_timer);
+            drawVizInto(rtTarget, targetViz, t, dt);
+        }
+        else {
+            currentViz->setBlendAlpha(alphaVal);
+            drawVizInto(rtCurrent, currentViz, t, dt);
+        }
+
+        if (overlayDelta) {
+            if (overlayEnabled) {
+                overlayAlpha += overlayDelta * dt;
+            }
+
+            if (overlayAlpha < -1.0f) {
+                overlayAlpha = -1.0f;
+            }
+            else if (overlayAlpha > 1.0f) {
+                overlayAlpha = 1.0f;
+            }
+        }
+        else if (overlayAlpha) {
+            overlayAlpha -= overlayAlpha * dt;
+            if (fabs(overlayAlpha) < 0.01f) {
+                overlayAlpha = 0.0f;
+            }
+        }
+
+        BeginDrawing();
+        ClearBackground(BLACK);
+
+        if (in_transition) {
+            float k = transition_timer;
+            switch (trans_type) {
+            case TRANS_CROSSFADE:
+                DrawTexturePro(rtCurrent.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
+                DrawTexturePro(rtTarget.texture, rtSource, rtDest, rtOrigin, 0.0f, ColorAlpha(WHITE, k));
+                break;
+            case TRANS_WIPERIGHT:
+                DrawTexturePro(rtCurrent.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
+                BeginScissorMode(0, 0, (int)(k*VIZ_WIDTH), VIZ_HEIGHT);
+                DrawTexturePro(rtTarget.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
+                EndScissorMode();
+                break;
+            case TRANS_WIPELEFT:
+                DrawTexturePro(rtCurrent.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
+                BeginScissorMode(VIZ_WIDTH - (int)(k*VIZ_WIDTH), 0, (int)(k*VIZ_WIDTH), VIZ_HEIGHT);
+                DrawTexturePro(rtTarget.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
+                EndScissorMode();
+                break;
+            case TRANS_WIPEDOWN:
+                DrawTexturePro(rtCurrent.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
+                BeginScissorMode(0, 0, VIZ_WIDTH, (int)(k*VIZ_HEIGHT));
+                DrawTexturePro(rtTarget.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
+                EndScissorMode();
+                break;
+            case TRANS_WIPEUP:
+                DrawTexturePro(rtCurrent.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
+                BeginScissorMode(0, VIZ_HEIGHT - (int)(k*VIZ_HEIGHT), VIZ_WIDTH, (int)(k*VIZ_HEIGHT));
+                DrawTexturePro(rtTarget.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
+                EndScissorMode();
+                break;
+            case TRANS_ZOOMIN: {
+                DrawTexturePro(rtCurrent.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
+                float zw = k*VIZ_WIDTH;
+                float zh = k*VIZ_HEIGHT;
+                Rectangle zoomDest = { (VIZ_WIDTH - zw) / 2.0f, (VIZ_HEIGHT - zh) / 2.0f, zw, zh };
+                DrawTexturePro(rtTarget.texture, rtSource, zoomDest, rtOrigin, 0.0f, WHITE);
+                break;
+            }
+            default:
+                DrawTexturePro(rtCurrent.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
+                break;
+            }
+        }
+        else {
+            DrawTexturePro(rtCurrent.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
+        }
+
+        if (overlayEnabled || overlayAlpha != 0.0f) {
+            overlayImage->setBlendAlpha(overlayAlpha);
+            overlayImage->updateVariables(t, dt, sample_data, vu->vu_levels, contest);
+            overlayImage->display(VIZ_WIDTH, VIZ_HEIGHT);
+        }
+
+        EndDrawing();
+
+        if (!in_transition) autoTimer += dt;
+        if (autoTimer > autoTimerLimit && !manualOverride) {
+            autoTimer = 0;
+            vizRandom();
+        }
+
+        if (!manualOverride) {
+            alphaVal = 1.0f + (sinf(t*0.115f+50.0f) + cosf(t*0.120f+200.0f) - sinf(100.0f+t*0.132f))/2.0f;
+            if (alphaVal < 0.20f) {
+                alphaVal = 0.20f;
+            }
+        }
     }
-    
-    std::cout << endl << "-----" << endl << "Done." << endl;
-    
-    glfwTerminate();
+
+    printf("\n-----\nDone.\n");
+
+    closeAudio();
+    UnloadRenderTexture(rtCurrent);
+    UnloadRenderTexture(rtTarget);
+    for (auto &tex : overlays) {
+        UnloadTexture(tex);
+    }
+    UnloadTexture(tex_noise);
+    UnloadTexture(tex_noise2);
+    UnloadTexture(tex_tex06);
+    UnloadTexture(tex_tex07);
+    CloseWindow();
 
     return 0;
 }
-

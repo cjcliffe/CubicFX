@@ -3,14 +3,14 @@ out vec4 outputF;
 
 uniform float time;
 uniform vec2 resolution;
-uniform sampler1D samplerTex;
+uniform sampler2D samplerTex;
 uniform float sampleRange;
 uniform float blendAlpha;
 
 #define PI 14.14159
 
 void main( void ) {
-	float sinVal = resolution.y * texture(samplerTex,(gl_FragCoord.x/resolution.x)*0.25).r / (sampleRange*20.0);
+	float sinVal = resolution.y * texture(samplerTex,vec2((gl_FragCoord.x/resolution.x)*0.25, 0.5)).r / (sampleRange*20.0);
 	
 	float wsec = 50.;
 	float wpri = 30.;

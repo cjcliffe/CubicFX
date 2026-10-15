@@ -6,40 +6,82 @@
 
 #include "ShaderViz.h"
 
-using namespace CubicVR;
+#include <cstdio>
+#include <cstdlib>
+#include <cmath>
 
 int VIZ_WIDTH = 1280;
 int VIZ_HEIGHT = 768;
 
-
-ShaderViz::ShaderViz(string vsFn, string fsFn) {
-    init(vsFn,fsFn);
+ShaderViz::ShaderViz(std::string vsFn, std::string fsFn) {
     timerKick = 0.0f;
-	timerMid = 0.0f;
-	timerHigh = 0.0f;
-    lastTime = 0.0f;
-	overlayTexture = NULL;
-	tex0Texture = NULL;
-	tex1Texture = NULL;
-	tex2Texture = NULL;
+    timerMid = 0.0f;
+    timerHigh = 0.0f;
+    blendAlpha = 1.0f;
+    lastBeat = 0;
+    randColor[0] = randColor[1] = randColor[2] = 1.0f;
+    randColor2[0] = randColor2[1] = randColor2[2] = 1.0f;
+    hasOverlay = false;
+    hasTex0 = false;
+    hasTex1 = false;
+    hasTex2 = false;
+    hasSampler = false;
+
+    shader = LoadShader(vsFn.c_str(), fsFn.c_str());
+
+    loc_resolution = GetShaderLocation(shader, "resolution");
+    loc_time = GetShaderLocation(shader, "time");
+    loc_mouse = GetShaderLocation(shader, "mouse");
+    loc_vuData = GetShaderLocation(shader, "vuData");
+    loc_baseColor = GetShaderLocation(shader, "baseColor");
+    loc_vuLow = GetShaderLocation(shader, "vuLow");
+    loc_vuMid = GetShaderLocation(shader, "vuMid");
+    loc_vuHigh = GetShaderLocation(shader, "vuHigh");
+    loc_randColor = GetShaderLocation(shader, "randColor");
+    loc_randColor2 = GetShaderLocation(shader, "randColor2");
+    loc_beatCounter = GetShaderLocation(shader, "beatCounter");
+    loc_beatCounterHalf = GetShaderLocation(shader, "beatCounterHalf");
+    loc_beatCounterQuarter = GetShaderLocation(shader, "beatCounterQuarter");
+    loc_timerKick = GetShaderLocation(shader, "timerKick");
+    loc_timerMid = GetShaderLocation(shader, "timerMid");
+    loc_timerHigh = GetShaderLocation(shader, "timerHigh");
+    loc_sampleRange = GetShaderLocation(shader, "sampleRange");
+    loc_blendAlpha = GetShaderLocation(shader, "blendAlpha");
+    loc_samplerTex = GetShaderLocation(shader, "samplerTex");
+    loc_overlayImage = GetShaderLocation(shader, "overlayImage");
+    loc_tex0 = GetShaderLocation(shader, "tex0");
+    loc_tex1 = GetShaderLocation(shader, "tex1");
+    loc_tex2 = GetShaderLocation(shader, "tex2");
+
+    if (loc_samplerTex >= 0) {
+        Image img = GenImageColor(1024, 1, BLANK);
+        ImageFormat(&img, PIXELFORMAT_UNCOMPRESSED_R32);
+        samplerTexture = LoadTextureFromImage(img);
+        UnloadImage(img);
+        SetTextureFilter(samplerTexture, TEXTURE_FILTER_BILINEAR);
+        hasSampler = true;
+    }
 }
 
-void ShaderViz::setOverlayTexture(Texture *oTex) {
-	overlayTexture = oTex;
+void ShaderViz::setOverlayTexture(Texture2D oTex) {
+    overlayTexture = oTex;
+    hasOverlay = true;
 }
 
-void ShaderViz::setTex0Texture(Texture *tex) {
-	tex0Texture = tex;
+void ShaderViz::setTex0Texture(Texture2D tex) {
+    tex0 = tex;
+    hasTex0 = true;
 }
 
-void ShaderViz::setTex1Texture(Texture *tex) {
-	tex1Texture = tex;
+void ShaderViz::setTex1Texture(Texture2D tex) {
+    tex1 = tex;
+    hasTex1 = true;
 }
 
-void ShaderViz::setTex2Texture(Texture *tex) {
-	tex2Texture = tex;
+void ShaderViz::setTex2Texture(Texture2D tex) {
+    tex2 = tex;
+    hasTex2 = true;
 }
-
 
 float ShaderViz::floatArrayAverage(float *data, int start, int end) {
     float accum = 0;
@@ -47,7 +89,7 @@ float ShaderViz::floatArrayAverage(float *data, int start, int end) {
         accum += data[i];
     }
     accum /= (float)end-start;
-    
+
     return accum;
 }
 
@@ -57,268 +99,141 @@ float ShaderViz::floatArrayAbsAverage(float *data, int start, int end) {
         accum += fabs(data[i]);
     }
     accum /= (float)end-start;
-    
+
     return accum;
 }
 
-
 float ShaderViz::floatArrayMax(float *data, int start, int end) {
-	float maxv = 0;
-	for (int i = start; i < end; i++) {
-		if (data[i] > maxv) maxv = data[i];
-	}
-	
-	return maxv;
+    float maxv = 0;
+    for (int i = start; i < end; i++) {
+        if (data[i] > maxv) maxv = data[i];
+    }
+
+    return maxv;
 }
 
 void ShaderViz::setBlendAlpha(float val) {
-	u_blendAlpha.set(val);
+    blendAlpha = val;
 }
 
-
-void ShaderViz::updateVariables(float time_value, vector<float> &sample_data, vector<float> &vu_data, BeatDetektorContest *contest) {
-	
-	vizShader.use();
-
-    a_vertexPosition.set(fsQuadMesh.getVBO()->gl_points);
-    a_vertexPosition.update();
-    
-    if (lastTime == 0) {
-        lastTime = time_value;
-        
-    }
-
-    float last_update = time_value-lastTime;
-    lastTime = time_value;
-    
+void ShaderViz::updateVariables(float time_value, float dt, std::vector<float> &sample_data, std::vector<float> &vu_data, BeatDetektorContest *contest) {
+    float last_update = dt;
     if (last_update == 0.0f) {
         last_update = 1.0f/60.0f;
     }
-    
-    if (u_time.size) {
-        u_time.set(time_value);
-        u_time.update();
+
+    if (loc_time >= 0) {
+        SetShaderValue(shader, loc_time, &time_value, SHADER_UNIFORM_FLOAT);
     }
-    
-    if (u_resolution.size) {
-        u_resolution.set(vec2(VIZ_WIDTH,VIZ_HEIGHT));
-        u_resolution.update();
+
+    if (loc_resolution >= 0) {
+        float res[2] = { (float)VIZ_WIDTH, (float)VIZ_HEIGHT };
+        SetShaderValue(shader, loc_resolution, res, SHADER_UNIFORM_VEC2);
     }
-    
-    if (u_mouse.size) {
-        u_mouse.set(vec2(sinf(time_value/10.0f),cosf(time_value/12.0f)));
-        u_mouse.update();
+
+    if (loc_mouse >= 0) {
+        float mouse[2] = { sinf(time_value/10.0f), cosf(time_value/12.0f) };
+        SetShaderValue(shader, loc_mouse, mouse, SHADER_UNIFORM_VEC2);
     }
-    
-    if (u_sampleData.size) {
-        u_sampleData.set(&sample_data[0]);
-        u_sampleData.update();
+
+    if (loc_sampleRange >= 0 && !sample_data.empty()) {
+        float range = floatArrayAbsAverage(&sample_data[0], 0, (int)sample_data.size());
+        SetShaderValue(shader, loc_sampleRange, &range, SHADER_UNIFORM_FLOAT);
     }
-    
-    if (u_sampleRange.size) {
-        u_sampleRange.set(floatArrayAbsAverage(&sample_data[0], 0, sample_data.size()));
-        u_sampleRange.update();
+
+    if (loc_vuData >= 0 && vu_data.size() >= 128) {
+        SetShaderValueV(shader, loc_vuData, &vu_data[0], SHADER_UNIFORM_FLOAT, 128);
     }
-    
-    if (u_vuData.size) {
-        u_vuData.set(&vu_data[0]);
-        u_vuData.update();
+
+    if (loc_vuLow >= 0 && vu_data.size() >= 128) {
+        float v = floatArrayAverage(&vu_data[0], 0, 6);
+        SetShaderValue(shader, loc_vuLow, &v, SHADER_UNIFORM_FLOAT);
     }
-    
-    if (u_vuLow.size) {
-		u_vuLow.set(floatArrayAverage(&vu_data[0], 0, 6));
-        u_vuLow.update();
+
+    if (loc_vuMid >= 0 && vu_data.size() >= 128) {
+        float v = floatArrayAverage(&vu_data[0], 50, 60);
+        SetShaderValue(shader, loc_vuMid, &v, SHADER_UNIFORM_FLOAT);
     }
-    
-    if (u_vuMid.size) {
-        u_vuMid.set(floatArrayAverage(&vu_data[0], 50, 60));
-        u_vuMid.update();
+
+    if (loc_vuHigh >= 0 && vu_data.size() >= 128) {
+        float v = floatArrayAverage(&vu_data[0], 100, 128);
+        SetShaderValue(shader, loc_vuHigh, &v, SHADER_UNIFORM_FLOAT);
     }
-    
-    if (u_vuHigh.size) {
-        u_vuHigh.set(floatArrayAverage(&vu_data[0], 100, 128));
-        u_vuHigh.update();
-    }
-    
+
     if (lastBeat != contest->beat_counter) {
-        randColor.x = 0.5 + ((float)rand()/(float)RAND_MAX) / 2.0;
-        randColor.y = 0.5 + ((float)rand()/(float)RAND_MAX) / 2.0;
-        randColor.z = 0.5 + ((float)rand()/(float)RAND_MAX) / 2.0;
-        
-        randColor2.x = 0.5 + ((float)rand()/(float)RAND_MAX) / 2.0;
-        randColor2.y = 0.5 + ((float)rand()/(float)RAND_MAX) / 2.0;
-        randColor2.z = 0.5 + ((float)rand()/(float)RAND_MAX) / 2.0;
-        
+        randColor[0] = 0.5f + ((float)rand()/(float)RAND_MAX) / 2.0f;
+        randColor[1] = 0.5f + ((float)rand()/(float)RAND_MAX) / 2.0f;
+        randColor[2] = 0.5f + ((float)rand()/(float)RAND_MAX) / 2.0f;
+
+        randColor2[0] = 0.5f + ((float)rand()/(float)RAND_MAX) / 2.0f;
+        randColor2[1] = 0.5f + ((float)rand()/(float)RAND_MAX) / 2.0f;
+        randColor2[2] = 0.5f + ((float)rand()/(float)RAND_MAX) / 2.0f;
+
         lastBeat = contest->beat_counter;
-        //            cout << randColor << endl;
-    }
-    
-    if (u_randColor.size) {
-        u_randColor.set(randColor);
-        u_randColor.update();
-    }
-    
-    if (u_randColor2.size) {
-        u_randColor2.set(randColor2);
-        u_randColor2.update();
-    }
-    
-    if (u_beatCounter.size) {
-        u_beatCounter.set(contest->beat_counter);
-        u_beatCounter.update();
     }
 
-    if (u_beatCounterHalf.size) {
-        u_beatCounterHalf.set(contest->half_counter);
-        u_beatCounterHalf.update();
+    if (loc_randColor >= 0) {
+        SetShaderValue(shader, loc_randColor, randColor, SHADER_UNIFORM_VEC3);
     }
 
-    if (u_beatCounterQuarter.size) {
-        u_beatCounterQuarter.set(contest->quarter_counter);
-        u_beatCounterQuarter.update();
+    if (loc_randColor2 >= 0) {
+        SetShaderValue(shader, loc_randColor2, randColor2, SHADER_UNIFORM_VEC3);
     }
 
-    if (u_timerKick.size) {
-		timerKick += floatArrayAverage(&vu_data[0], 0, 6)*last_update*5.0;
-        u_timerKick.set(timerKick);
-        u_timerKick.update();
-    }
-    
-    if (u_timerMid.size) {
-        timerMid += floatArrayAverage(&vu_data[0], 50, 60)*last_update*5.0;
-        u_timerMid.set(timerMid);
-        u_timerMid.update();
+    if (loc_beatCounter >= 0) {
+        SetShaderValue(shader, loc_beatCounter, &contest->beat_counter, SHADER_UNIFORM_INT);
     }
 
-    if (u_timerHigh.size) {
-        timerHigh += floatArrayAverage(&vu_data[0], 100, 128)*last_update*5.0;
-        u_timerHigh.set(timerHigh);
-        u_timerHigh.update();
+    if (loc_beatCounterHalf >= 0) {
+        SetShaderValue(shader, loc_beatCounterHalf, &contest->half_counter, SHADER_UNIFORM_INT);
     }
 
-	if (u_samplerTex.size) {
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_1D, samplerTex);
-		glBindSampler(0, samplerTexSampler);
-		glPixelStorei(GL_UNPACK_ALIGNMENT,2);
-		glTexImage1D(GL_TEXTURE_1D, 0, GL_R32F, 1024, 0, GL_RED, GL_FLOAT, &sample_data[0]);
-		u_samplerTex.set(0);
-		u_samplerTex.update();
+    if (loc_beatCounterQuarter >= 0) {
+        SetShaderValue(shader, loc_beatCounterQuarter, &contest->quarter_counter, SHADER_UNIFORM_INT);
+    }
 
-//		cout << samplerTexVal[1023] << endl;
-	}
+    if (loc_timerKick >= 0 && vu_data.size() >= 128) {
+        timerKick += floatArrayAverage(&vu_data[0], 0, 6)*last_update*5.0f;
+        SetShaderValue(shader, loc_timerKick, &timerKick, SHADER_UNIFORM_FLOAT);
+    }
 
+    if (loc_timerMid >= 0 && vu_data.size() >= 128) {
+        timerMid += floatArrayAverage(&vu_data[0], 50, 60)*last_update*5.0f;
+        SetShaderValue(shader, loc_timerMid, &timerMid, SHADER_UNIFORM_FLOAT);
+    }
 
-	if (u_blendAlpha.size) {
-		u_blendAlpha.update();
-	}
+    if (loc_timerHigh >= 0 && vu_data.size() >= 128) {
+        timerHigh += floatArrayAverage(&vu_data[0], 100, 128)*last_update*5.0f;
+        SetShaderValue(shader, loc_timerHigh, &timerHigh, SHADER_UNIFORM_FLOAT);
+    }
 
-	if (u_overlayImage.size && overlayTexture != NULL) {
-		u_overlayImage.set(0);
-		u_overlayImage.update();
-		overlayTexture->bind(0);
-	}
+    if (loc_samplerTex >= 0 && hasSampler && sample_data.size() >= 1024) {
+        UpdateTexture(samplerTexture, &sample_data[0]);
+        SetShaderValueTexture(shader, loc_samplerTex, samplerTexture);
+    }
 
-	if (u_tex0.size && tex0Texture != NULL) {
-		u_tex0.set(0);
-		u_tex0.update();
-		tex0Texture->bind(0);
-	}
-	if (u_tex1.size && tex1Texture != NULL) {
-		u_tex1.set(1);
-		u_tex1.update();
-		tex1Texture->bind(1);
-	}
-	if (u_tex2.size && tex2Texture != NULL) {
-		u_tex2.set(2);
-		u_tex2.update();
-		tex2Texture->bind(2);
-	}
+    if (loc_blendAlpha >= 0) {
+        SetShaderValue(shader, loc_blendAlpha, &blendAlpha, SHADER_UNIFORM_FLOAT);
+    }
+
+    if (loc_overlayImage >= 0 && hasOverlay) {
+        SetShaderValueTexture(shader, loc_overlayImage, overlayTexture);
+    }
+
+    if (loc_tex0 >= 0 && hasTex0) {
+        SetShaderValueTexture(shader, loc_tex0, tex0);
+    }
+    if (loc_tex1 >= 0 && hasTex1) {
+        SetShaderValueTexture(shader, loc_tex1, tex1);
+    }
+    if (loc_tex2 >= 0 && hasTex2) {
+        SetShaderValueTexture(shader, loc_tex2, tex2);
+    }
 }
 
-
-void ShaderViz::display()
+void ShaderViz::display(int width, int height)
 {
-    vizShader.use();
-    
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,fsQuadMesh.getVBO()->gl_elements);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, NULL);
-}
-
-
-void ShaderViz::init(string vsFn, string fsFn) {
-    cout << "OpenGL Version: " << glGetString(GL_VERSION) << endl;
-    cout << "Shader language version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << endl;
-    
-    vizShader.loadTextFile(vsFn, fsFn);
-    vizShader.compile();
-
-    if (!vizShader.isCompiled()) {
-        vizShader.dumpShaderLog();
-    } else {
-        cout << "Shader compile success." << endl;
-        shaderVariables vars;
-        vizShader.getVariables(vars);
-        vars.dump();
-    }
-    
-    lastBeat = 0;
-    
-    vizShader.getVariables(shaderVars);
-    
-    a_vertexPosition = shaderVars.getAttribute("vertexPosition");
-    u_resolution = shaderVars.getUniform("resolution");
-    u_time = shaderVars.getUniform("time");
-    u_mouse = shaderVars.getUniform("mouse");
-    
-    u_sampleData = shaderVars.getUniform("sampleData[0]");
-    u_vuData = shaderVars.getUniform("vuData[0]");
-    u_baseColor = shaderVars.getUniform("baseColor");
-    
-    u_vuLow = shaderVars.getUniform("vuLow");
-    u_vuMid = shaderVars.getUniform("vuMid");
-    u_vuHigh = shaderVars.getUniform("vuHigh");
-    
-    u_randColor = shaderVars.getUniform("randColor");
-    u_randColor2 = shaderVars.getUniform("randColor2");
-    
-    u_beatCounter = shaderVars.getUniform("beatCounter");
-    u_beatCounterHalf = shaderVars.getUniform("beatCounterHalf");
-    u_beatCounterQuarter = shaderVars.getUniform("beatCounterQuarter");
-    
-    u_timerKick = shaderVars.getUniform("timerKick");
-    u_timerMid = shaderVars.getUniform("timerMid");
-    u_timerHigh = shaderVars.getUniform("timerHigh");
-    u_sampleRange = shaderVars.getUniform("sampleRange");
-    
-	u_blendAlpha = shaderVars.getUniform("blendAlpha");
-
-	u_overlayImage = shaderVars.getUniform("overlayImage");
-
-	glGenTextures(1, &samplerTex);
-	glBindTexture(GL_TEXTURE_1D, samplerTex);
-
-	glGenSamplers(1, &samplerTexSampler);
-	glSamplerParameteri(samplerTexSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glSamplerParameteri(samplerTexSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-	u_samplerTex = shaderVars.getUniform("samplerTex");
-
-
-	u_tex0 = shaderVars.getUniform("tex0");
-	u_tex1 = shaderVars.getUniform("tex1");
-	u_tex2 = shaderVars.getUniform("tex2");
-
-
-
-
-    fsQuadMesh.addPoint(vec3(-1.0f, -1.0f, -1.0f));
-    fsQuadMesh.addPoint(vec3(1.0f, -1.0f, -1.0f));
-    fsQuadMesh.addPoint(vec3(1.0f, 1.0f, -1.0f));
-    fsQuadMesh.addPoint(vec3(-1.0f, 1.0f, -1.0f));
-    
-    fsQuadMesh.newFace().setPoints(triangleFaceRef(0,1,2));
-    fsQuadMesh.newFace().setPoints(triangleFaceRef(2,3,0));
-    
-    fsQuadMesh.prepare();
+    BeginShaderMode(shader);
+    DrawRectangle(0, 0, width, height, WHITE);
+    EndShaderMode();
 }
