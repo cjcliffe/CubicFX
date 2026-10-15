@@ -165,6 +165,41 @@ static void closeAudio() {
     audioRunning = false;
 }
 
+static float normGain = 1.0f;
+static bool agcEnabled = true;
+
+static void normalizeAudioBlock(vector<float> &block) {
+    double mean = 0.0;
+    for (float v : block) {
+        mean += v;
+    }
+    mean /= (double)block.size();
+
+    float peak = 0.0f;
+    for (float v : block) {
+        float a = fabsf((float)(v - mean));
+        if (a > peak) {
+            peak = a;
+        }
+    }
+
+    if (peak > 1e-4f) {
+        float target = 0.9f / peak;
+        if (target > 32.0f) {
+            target = 32.0f;
+        }
+        if (target < 0.5f) {
+            target = 0.5f;
+        }
+        float rate = (target > normGain) ? 0.4f : 0.03f;
+        normGain += (target - normGain) * rate;
+    }
+
+    for (float &v : block) {
+        v = tanhf(normGain * (float)(v - mean));
+    }
+}
+
 static void captureAudio() {
     if (!audioRunning) {
         return;
@@ -180,6 +215,10 @@ static void captureAudio() {
     }
     if (!fresh) {
         return;
+    }
+
+    if (agcEnabled) {
+        normalizeAudioBlock(sample_data);
     }
 
     fft_data = sample_data;
@@ -421,6 +460,7 @@ struct SetupChoice {
     int resPreset = 4;
     unsigned int audioDevice = 0;
     int audioIndex = 0;
+    bool agc = true;
 };
 
 static const int resPresets[][2] = {
@@ -536,6 +576,18 @@ static bool runSetupDialog(SetupChoice &choice, vector<AudioDevInfo> &audioDevs)
         }
 
         DrawText("Audio input:", 16, (int)y, 20, LIGHTGRAY);
+        Rectangle agcHit = { (float)dlgW - 116 - 8 - 160, y - 4, 160, 26 };
+        Vector2 agcMouse = GetMousePosition();
+        bool agcHover = CheckCollisionPointRec(agcMouse, agcHit);
+        if (agcHover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            choice.agc = !choice.agc;
+        }
+        float agcBoxY = agcHit.y + 5;
+        DrawRectangleLinesEx({ agcHit.x, agcBoxY, 16, 16 }, 1, LIGHTGRAY);
+        if (choice.agc) {
+            DrawRectangle((int)agcHit.x + 3, (int)agcBoxY + 3, 10, 10, SKYBLUE);
+        }
+        DrawText("Auto Gain", (int)agcHit.x + 22, (int)(agcHit.y + 3), 20, agcHover ? RAYWHITE : LIGHTGRAY);
         if (uiButton({ (float)dlgW - 116, y - 4, 100, 26 }, "Refresh", false)) {
             unsigned int keepId = choice.audioDevice;
             audioDevs = listInputDevices();
@@ -669,6 +721,8 @@ static bool runVisualizer(SetupChoice &choice)
     alphaVal = 1.0f;
     sample_data.assign(BUF, 0.0f);
     fft_data.assign(BUF, 0.0f);
+    normGain = 1.0f;
+    agcEnabled = choice.agc;
     {
         lock_guard<mutex> lock(audioMutex);
         staging.clear();
