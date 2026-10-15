@@ -1,10 +1,13 @@
 # CubicFX
 BeatDetektor / raylib standalone OpenGL shader based music visualizer
 
+[![CircleCI](https://dl.circleci.com/status-badge/img/gh/cjcliffe/CubicFX/tree/master.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/cjcliffe/CubicFX/tree/master)
+
 ![CubicFX inversion machine visualizer](docs/screenshot.png)
 
 This was a minimal app created for a few select parties. It was originally built
 on CubicVR2/GLFW/OpenAL and has since been ported to raylib with RtAudio capture.
+Recent development assistance by Muse Spark 1.3.
 
 Many shaders are derivatives of ShaderToy or the old glsl.heroku site and may not yet contain proper attribution.
 
