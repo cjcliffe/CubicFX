@@ -469,6 +469,8 @@ static bool runSetupDialog(SetupChoice &choice, const vector<AudioDevInfo> &audi
     }
 
     bool done = false;
+    float audioScroll = 0.0f;
+    bool draggingScroll = false;
     while (!WindowShouldClose() && !done) {
         if (IsKeyPressed(KEY_ENTER)) {
             done = true;
@@ -533,20 +535,82 @@ static bool runSetupDialog(SetupChoice &choice, const vector<AudioDevInfo> &audi
         if (audioDevs.empty()) {
             DrawText("No input devices found.", 16, (int)y, 20, RED);
             y += 30;
-        }
-        int shown = 0;
-        for (int i = 0; i < (int)audioDevs.size() && shown < 6; i++, shown++) {
-            char label[160];
-            snprintf(label, sizeof(label), "%s (%uch)", shortName(audioDevs[i].name, 40).c_str(), audioDevs[i].inChannels);
-            if (uiButton({ 16, y, dlgW - 32, 30 }, label, i == choice.audioIndex)) {
-                choice.audioIndex = i;
-                choice.audioDevice = audioDevs[i].id;
+        } else {
+            const float rowH = 36.0f;
+            const float barW = 12.0f;
+            float panelH = ((float)dlgH - 96.0f) - y;
+            if (panelH < 2 * rowH - 6) {
+                panelH = 2 * rowH - 6;
             }
-            y += 36;
-        }
-        if ((int)audioDevs.size() > shown) {
-            DrawText(TextFormat("+ %d more (showing first %d)", (int)audioDevs.size() - shown, shown), 16, (int)y, 20, GRAY);
-            y += 28;
+            Rectangle panel = { 16, y, (float)dlgW - 32, panelH };
+            float contentH = (float)audioDevs.size() * rowH;
+            bool showBar = contentH > panel.height;
+            float maxScroll = contentH - panel.height;
+            if (maxScroll < 0) {
+                maxScroll = 0;
+            }
+
+            Vector2 wheelMouse = GetMousePosition();
+            bool overPanel = CheckCollisionPointRec(wheelMouse, panel);
+            if (overPanel && !draggingScroll) {
+                audioScroll -= GetMouseWheelMove() * rowH;
+            }
+            if (audioScroll < 0) {
+                audioScroll = 0;
+            }
+            if (audioScroll > maxScroll) {
+                audioScroll = maxScroll;
+            }
+
+            float thumbH = showBar ? panel.height * (panel.height / contentH) : 0.0f;
+            if (thumbH < 20.0f) {
+                thumbH = 20.0f;
+            }
+            Rectangle track = { panel.x + panel.width - barW, panel.y, barW, panel.height };
+
+            if (showBar && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(wheelMouse, track)) {
+                draggingScroll = true;
+            }
+            if (draggingScroll) {
+                if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && (panel.height - thumbH) >= 1.0f) {
+                    float frac = (wheelMouse.y - panel.y - thumbH * 0.5f) / (panel.height - thumbH);
+                    if (frac < 0) {
+                        frac = 0;
+                    }
+                    if (frac > 1) {
+                        frac = 1;
+                    }
+                    audioScroll = frac * maxScroll;
+                } else if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+                    draggingScroll = false;
+                }
+            }
+
+            float thumbY = panel.y;
+            if (showBar && maxScroll > 0) {
+                thumbY = panel.y + (panel.height - thumbH) * (audioScroll / maxScroll);
+            }
+
+            DrawRectangleRec(panel, Color{ 16, 16, 16, 255 });
+            BeginScissorMode((int)panel.x, (int)panel.y, (int)panel.width, (int)panel.height);
+            for (int i = 0; i < (int)audioDevs.size(); i++) {
+                char label[160];
+                snprintf(label, sizeof(label), "%s (%uch)", shortName(audioDevs[i].name, 40).c_str(), audioDevs[i].inChannels);
+                float rowW = panel.width - (showBar ? barW + 4 : 0);
+                Rectangle row = { panel.x, panel.y + i * rowH - audioScroll, rowW, 30 };
+                if (uiButton(row, label, i == choice.audioIndex) && overPanel && !draggingScroll) {
+                    choice.audioIndex = i;
+                    choice.audioDevice = audioDevs[i].id;
+                }
+            }
+            EndScissorMode();
+
+            if (showBar) {
+                DrawRectangleRec(track, Color{ 48, 48, 48, 255 });
+                DrawRectangleRec({ track.x, thumbY, barW, thumbH }, LIGHTGRAY);
+            }
+
+            y += panel.height + 10;
         }
 
         y += 10;
