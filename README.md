@@ -12,7 +12,7 @@ Many shaders are derivatives of ShaderToy or the old glsl.heroku site and may no
 
 - CMake 3.16 or newer
 - A C++17 compiler (Visual Studio 2022 on Windows)
-- Internet access at configure time — raylib and RtAudio are fetched automatically
+- Internet access at configure time — raylib, RtAudio, and raygui are fetched automatically
 - An audio input device (microphone, line-in, or "stereo mix") for the visuals to react to
 
 ## Build
@@ -22,13 +22,21 @@ cmake -S . -B build
 cmake --build build --config Release
 ```
 
-Pinned dependencies (see `CMakeLists.txt`): raylib 6.0 and RtAudio 6.0.1,
+Pinned dependencies (see `CMakeLists.txt`): raylib 6.0, RtAudio 6.0.1,
+and raygui (tracking master, header-only),
 fetched with shallow clones. No vendored libraries or external checkouts required.
+
+## Tests
+
+```bat
+cmake --build build --config Release
+ctest --test-dir build -C Release --output-on-failure
+```
 
 ## Run
 
-Launch `CubicFX` from the build directory so it finds its `shaders/` and `png/`
-asset folders, e.g. from `build/`:
+Launch `CubicFX` from the build directory so it finds its `shaders/`, `png/`,
+and `fonts/` asset folders, e.g. from `build/`:
 
 ```bat
 CubicFX.exe
