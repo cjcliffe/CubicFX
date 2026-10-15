@@ -532,6 +532,7 @@ struct SetupChoice {
     int audioIndex = 0;
     bool agc = true;
     bool testTone = false;
+    bool vsync = true;
 };
 
 struct ResPreset {
@@ -680,6 +681,18 @@ static bool runSetupDialog(SetupChoice &choice, vector<AudioDevInfo> &audioDevs)
         }
 
         DrawText("Mode:", 16, (int)y, 20, LIGHTGRAY);
+        Rectangle vsyncHit = { 100, y - 4, 110, 26 };
+        Vector2 vsyncMouse = GetMousePosition();
+        bool vsyncHover = CheckCollisionPointRec(vsyncMouse, vsyncHit);
+        if (vsyncHover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            choice.vsync = !choice.vsync;
+        }
+        float vsyncBoxY = vsyncHit.y + 5;
+        DrawRectangleLinesEx({ vsyncHit.x, vsyncBoxY, 16, 16 }, 1, LIGHTGRAY);
+        if (choice.vsync) {
+            DrawRectangle((int)vsyncHit.x + 3, (int)vsyncBoxY + 3, 10, 10, SKYBLUE);
+        }
+        DrawText("VSync", (int)vsyncHit.x + 22, (int)(vsyncHit.y + 3), 20, vsyncHover ? RAYWHITE : LIGHTGRAY);
         y += 26;
         if (uiButton({ 16, y, (dlgW - 40) / 2, 30 }, "Windowed", !choice.fullscreen)) {
             choice.fullscreen = false;
@@ -1056,7 +1069,13 @@ static bool runVisualizer(SetupChoice &choice)
             float dy = mp.y - lastClickPos.y;
             if (lastClickTime >= 0.0 && (now - lastClickTime) < 0.4 && (dx*dx + dy*dy) < 64.0f) {
                 choice.fullscreen = !choice.fullscreen;
-                applyWindowMode(choice);
+    applyWindowMode(choice);
+
+    if (choice.vsync) {
+        SetWindowState(FLAG_VSYNC_HINT);
+    } else {
+        ClearWindowState(FLAG_VSYNC_HINT);
+    }
                 lastClickTime = -1.0;
             } else {
                 lastClickTime = now;
