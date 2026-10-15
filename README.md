@@ -34,9 +34,8 @@ asset folders, e.g. from `build/`:
 CubicFX.exe
 ```
 
-A setup dialog appears first: pick the display monitor, windowed or fullscreen
-mode, window resolution, and audio input device, then press Start (or Enter).
-Command-line arguments can prefill the dialog:
+A setup dialog appears first — pick options, then press Start (or Enter).
+`Esc` in the dialog quits. Command-line arguments can prefill the dialog:
 
 ```
 CubicFX.exe [monitor] [width height] [autoTimerLimit]
@@ -46,6 +45,19 @@ CubicFX.exe [monitor] [width height] [autoTimerLimit]
 - `width height` — windowed resolution
 - `autoTimerLimit` — seconds before auto-advancing to a random visualizer
 
+### Setup options
+
+- **Display monitor** — which screen the visualizer opens on
+- **Mode** — windowed or fullscreen
+- **Resolution** — render resolution in both modes; fullscreen upscales it to
+  the monitor's native resolution, so a lower choice runs faster
+- **Audio input** — capture device list (mouse wheel or scrollbar to scroll,
+  `Refresh` to re-enumerate), plus:
+  - **Test tone** — synthesized signal instead of the microphone, useful for
+    checking that the visuals react without needing live audio
+  - **Auto Gain** — automatic input leveling for quiet sources; uncheck to use
+    the raw input signal
+
 ## Controls
 
 - Visualizer select — number keys, `Q`–`P`, `A`–`M`, brackets, `;` `'` `-` `=`
@@ -53,4 +65,5 @@ CubicFX.exe [monitor] [width height] [autoTimerLimit]
 - `Shift` + `1`–`6` — overlay image select, `Shift` + `0` — toggle overlay
 - `Up` / `Down` — beat detector high/low range mode
 - `PageUp` / `PageDown` (or `,` / `.`, `Shift` for coarse) — global alpha
+- Double-click — toggle windowed/fullscreen
 - `Esc` — back to setup (quit from the setup dialog)

@@ -572,28 +572,27 @@ static bool runSetupDialog(SetupChoice &choice, vector<AudioDevInfo> &audioDevs)
         }
         y += 36;
 
+        DrawText("Resolution:", 16, (int)y, 20, LIGHTGRAY);
+        y += 26;
+        for (int i = 0; i < numResPresets; i++) {
+            char label[32];
+            snprintf(label, sizeof(label), "%dx%d", resPresets[i][0], resPresets[i][1]);
+            float bw = (dlgW - 32 - 3 * 8) / 4;
+            float bx = 16 + (i % 4) * (bw + 8);
+            float by = y + (i / 4) * 36;
+            if (uiButton({ bx, by, bw, 30 }, label, i == choice.resPreset)) {
+                choice.resPreset = i;
+                choice.width = resPresets[i][0];
+                choice.height = resPresets[i][1];
+            }
+        }
+        y += ((numResPresets + 3) / 4) * 36 + 6;
         if (choice.fullscreen) {
-            char label[128];
-            snprintf(label, sizeof(label), "Fullscreen uses monitor native: %dx%d",
+            char label[160];
+            snprintf(label, sizeof(label), "Fullscreen renders chosen res, upscaled to %dx%d",
                 GetMonitorWidth(choice.monitor), GetMonitorHeight(choice.monitor));
             DrawText(label, 16, (int)y, 20, GRAY);
             y += 28;
-        } else {
-            DrawText("Resolution:", 16, (int)y, 20, LIGHTGRAY);
-            y += 26;
-            for (int i = 0; i < numResPresets; i++) {
-                char label[32];
-                snprintf(label, sizeof(label), "%dx%d", resPresets[i][0], resPresets[i][1]);
-                float bw = (dlgW - 32 - 3 * 8) / 4;
-                float bx = 16 + (i % 4) * (bw + 8);
-                float by = y + (i / 4) * 36;
-                if (uiButton({ bx, by, bw, 30 }, label, i == choice.resPreset)) {
-                    choice.resPreset = i;
-                    choice.width = resPresets[i][0];
-                    choice.height = resPresets[i][1];
-                }
-            }
-            y += ((numResPresets + 3) / 4) * 36 + 6;
         }
 
         DrawText("Audio input:", 16, (int)y, 20, LIGHTGRAY);
@@ -738,6 +737,25 @@ static void drawVizInto(RenderTexture2D rt, Visualizer *viz, float t, float dt) 
     EndTextureMode();
 }
 
+static void applyWindowMode(const SetupChoice &choice) {
+    if (choice.fullscreen) {
+        SetWindowSize(GetMonitorWidth(choice.monitor), GetMonitorHeight(choice.monitor));
+        SetWindowMonitor(choice.monitor);
+        if (!IsWindowFullscreen()) {
+            ToggleFullscreen();
+        }
+    } else {
+        if (IsWindowFullscreen()) {
+            ToggleFullscreen();
+        }
+        SetWindowSize(choice.width, choice.height);
+        SetWindowMonitor(choice.monitor);
+    }
+    VIZ_WIDTH = choice.width;
+    VIZ_HEIGHT = choice.height;
+    SetWindowTitle("BeatDetektor CubicFX");
+}
+
 static bool runVisualizer(SetupChoice &choice)
 {
     currentViz = NULL;
@@ -763,26 +781,7 @@ static bool runVisualizer(SetupChoice &choice)
         blockFresh = false;
     }
 
-    if (choice.fullscreen) {
-        int monW = GetMonitorWidth(choice.monitor);
-        int monH = GetMonitorHeight(choice.monitor);
-        SetWindowSize(monW, monH);
-        SetWindowMonitor(choice.monitor);
-        if (!IsWindowFullscreen()) {
-            ToggleFullscreen();
-        }
-        VIZ_WIDTH = GetScreenWidth();
-        VIZ_HEIGHT = GetScreenHeight();
-    } else {
-        if (IsWindowFullscreen()) {
-            ToggleFullscreen();
-        }
-        SetWindowSize(choice.width, choice.height);
-        SetWindowMonitor(choice.monitor);
-        VIZ_WIDTH = choice.width;
-        VIZ_HEIGHT = choice.height;
-    }
-    SetWindowTitle("BeatDetektor CubicFX");
+    applyWindowMode(choice);
 
     initBD();
 
@@ -900,13 +899,15 @@ static bool runVisualizer(SetupChoice &choice)
 
     RenderTexture2D rtCurrent = LoadRenderTexture(VIZ_WIDTH, VIZ_HEIGHT);
     RenderTexture2D rtTarget = LoadRenderTexture(VIZ_WIDTH, VIZ_HEIGHT);
+    RenderTexture2D rtOverlay = LoadRenderTexture(VIZ_WIDTH, VIZ_HEIGHT);
     Rectangle rtSource = { 0, 0, (float)VIZ_WIDTH, -(float)VIZ_HEIGHT };
-    Rectangle rtDest = { 0, 0, (float)VIZ_WIDTH, (float)VIZ_HEIGHT };
     Vector2 rtOrigin = { 0, 0 };
 
     SetTargetFPS(60);
 
     bool toMenu = false;
+    double lastClickTime = -1.0;
+    Vector2 lastClickPos = { 0, 0 };
     while (!WindowShouldClose() && !toMenu)
     {
         float dt = GetFrameTime();
@@ -916,6 +917,21 @@ static bool runVisualizer(SetupChoice &choice)
         processBD(t, dt);
 
         pollKeys();
+
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            double now = GetTime();
+            Vector2 mp = GetMousePosition();
+            float dx = mp.x - lastClickPos.x;
+            float dy = mp.y - lastClickPos.y;
+            if (lastClickTime >= 0.0 && (now - lastClickTime) < 0.4 && (dx*dx + dy*dy) < 64.0f) {
+                choice.fullscreen = !choice.fullscreen;
+                applyWindowMode(choice);
+                lastClickTime = -1.0;
+            } else {
+                lastClickTime = now;
+                lastClickPos = mp;
+            }
+        }
 
         if (IsKeyPressed(KEY_ESCAPE)) {
             toMenu = true;
@@ -980,6 +996,20 @@ static bool runVisualizer(SetupChoice &choice)
             }
         }
 
+        bool showOverlay = overlayEnabled || overlayAlpha != 0.0f;
+        if (showOverlay) {
+            overlayImage->setBlendAlpha(overlayAlpha);
+            overlayImage->updateVariables(t, dt, sample_data, vu->vu_levels, contest);
+            BeginTextureMode(rtOverlay);
+            ClearBackground(BLANK);
+            overlayImage->display(VIZ_WIDTH, VIZ_HEIGHT);
+            EndTextureMode();
+        }
+
+        float scrW = (float)GetScreenWidth();
+        float scrH = (float)GetScreenHeight();
+        Rectangle screenDest = { 0, 0, scrW, scrH };
+
         BeginDrawing();
         ClearBackground(BLACK);
 
@@ -987,54 +1017,52 @@ static bool runVisualizer(SetupChoice &choice)
             float k = transition_timer;
             switch (trans_type) {
             case TRANS_CROSSFADE:
-                DrawTexturePro(rtCurrent.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
-                DrawTexturePro(rtTarget.texture, rtSource, rtDest, rtOrigin, 0.0f, ColorAlpha(WHITE, k));
+                DrawTexturePro(rtCurrent.texture, rtSource, screenDest, rtOrigin, 0.0f, WHITE);
+                DrawTexturePro(rtTarget.texture, rtSource, screenDest, rtOrigin, 0.0f, ColorAlpha(WHITE, k));
                 break;
             case TRANS_WIPERIGHT:
-                DrawTexturePro(rtCurrent.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
-                BeginScissorMode(0, 0, (int)(k*VIZ_WIDTH), VIZ_HEIGHT);
-                DrawTexturePro(rtTarget.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
+                DrawTexturePro(rtCurrent.texture, rtSource, screenDest, rtOrigin, 0.0f, WHITE);
+                BeginScissorMode(0, 0, (int)(k*scrW), (int)scrH);
+                DrawTexturePro(rtTarget.texture, rtSource, screenDest, rtOrigin, 0.0f, WHITE);
                 EndScissorMode();
                 break;
             case TRANS_WIPELEFT:
-                DrawTexturePro(rtCurrent.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
-                BeginScissorMode(VIZ_WIDTH - (int)(k*VIZ_WIDTH), 0, (int)(k*VIZ_WIDTH), VIZ_HEIGHT);
-                DrawTexturePro(rtTarget.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
+                DrawTexturePro(rtCurrent.texture, rtSource, screenDest, rtOrigin, 0.0f, WHITE);
+                BeginScissorMode((int)(scrW - k*scrW), 0, (int)(k*scrW), (int)scrH);
+                DrawTexturePro(rtTarget.texture, rtSource, screenDest, rtOrigin, 0.0f, WHITE);
                 EndScissorMode();
                 break;
             case TRANS_WIPEDOWN:
-                DrawTexturePro(rtCurrent.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
-                BeginScissorMode(0, 0, VIZ_WIDTH, (int)(k*VIZ_HEIGHT));
-                DrawTexturePro(rtTarget.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
+                DrawTexturePro(rtCurrent.texture, rtSource, screenDest, rtOrigin, 0.0f, WHITE);
+                BeginScissorMode(0, 0, (int)scrW, (int)(k*scrH));
+                DrawTexturePro(rtTarget.texture, rtSource, screenDest, rtOrigin, 0.0f, WHITE);
                 EndScissorMode();
                 break;
             case TRANS_WIPEUP:
-                DrawTexturePro(rtCurrent.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
-                BeginScissorMode(0, VIZ_HEIGHT - (int)(k*VIZ_HEIGHT), VIZ_WIDTH, (int)(k*VIZ_HEIGHT));
-                DrawTexturePro(rtTarget.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
+                DrawTexturePro(rtCurrent.texture, rtSource, screenDest, rtOrigin, 0.0f, WHITE);
+                BeginScissorMode(0, (int)(scrH - k*scrH), (int)scrW, (int)(k*scrH));
+                DrawTexturePro(rtTarget.texture, rtSource, screenDest, rtOrigin, 0.0f, WHITE);
                 EndScissorMode();
                 break;
             case TRANS_ZOOMIN: {
-                DrawTexturePro(rtCurrent.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
-                float zw = k*VIZ_WIDTH;
-                float zh = k*VIZ_HEIGHT;
-                Rectangle zoomDest = { (VIZ_WIDTH - zw) / 2.0f, (VIZ_HEIGHT - zh) / 2.0f, zw, zh };
+                DrawTexturePro(rtCurrent.texture, rtSource, screenDest, rtOrigin, 0.0f, WHITE);
+                float zw = k*scrW;
+                float zh = k*scrH;
+                Rectangle zoomDest = { (scrW - zw) / 2.0f, (scrH - zh) / 2.0f, zw, zh };
                 DrawTexturePro(rtTarget.texture, rtSource, zoomDest, rtOrigin, 0.0f, WHITE);
                 break;
             }
             default:
-                DrawTexturePro(rtCurrent.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
+                DrawTexturePro(rtCurrent.texture, rtSource, screenDest, rtOrigin, 0.0f, WHITE);
                 break;
             }
         }
         else {
-            DrawTexturePro(rtCurrent.texture, rtSource, rtDest, rtOrigin, 0.0f, WHITE);
+            DrawTexturePro(rtCurrent.texture, rtSource, screenDest, rtOrigin, 0.0f, WHITE);
         }
 
-        if (overlayEnabled || overlayAlpha != 0.0f) {
-            overlayImage->setBlendAlpha(overlayAlpha);
-            overlayImage->updateVariables(t, dt, sample_data, vu->vu_levels, contest);
-            overlayImage->display(VIZ_WIDTH, VIZ_HEIGHT);
+        if (showOverlay) {
+            DrawTexturePro(rtOverlay.texture, rtSource, screenDest, rtOrigin, 0.0f, WHITE);
         }
 
         EndDrawing();
@@ -1058,6 +1086,7 @@ static bool runVisualizer(SetupChoice &choice)
     closeAudio();
     UnloadRenderTexture(rtCurrent);
     UnloadRenderTexture(rtTarget);
+    UnloadRenderTexture(rtOverlay);
     for (auto &tex : overlays) {
         UnloadTexture(tex);
     }
