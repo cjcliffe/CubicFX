@@ -1,12 +1,17 @@
 #pragma once
 
+#include <memory>
+
 #include "BeatDetektor.h"
 
-extern BeatDetektor *det_low;
-extern BeatDetektor *det_high;
-extern BeatDetektor *det;
-extern BeatDetektorVU *vu;
-extern BeatDetektorContest *contest;
+class BeatEngine {
+public:
+    BeatEngine();
+    void process(float timer_seconds, float dt);
 
-void initBD();
-void processBD(float timer_seconds, float dt);
+    std::unique_ptr<BeatDetektor> det_low;
+    std::unique_ptr<BeatDetektor> det_high;
+    BeatDetektor *det = nullptr;
+    std::unique_ptr<BeatDetektorVU> vu;
+    std::unique_ptr<BeatDetektorContest> contest;
+};

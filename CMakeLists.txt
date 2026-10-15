@@ -112,4 +112,10 @@ endif ()
 
 target_link_libraries(CubicFX PRIVATE raylib rtaudio)
 
+enable_testing()
+add_executable(FlexTest tests/FlexTest.cpp)
+target_include_directories(FlexTest PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(FlexTest PRIVATE raylib)
+add_test(NAME FlexTest COMMAND FlexTest)
+
 

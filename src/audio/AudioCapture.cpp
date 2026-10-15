@@ -4,6 +4,7 @@
 
 #include <cstdio>
 #include <cmath>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -28,7 +29,7 @@ unsigned int audioDefaultInputDevice() {
 // RtAudio delivers input on its own callback thread; the render thread picks
 // up complete blocks. staging accumulates callback samples, readyBlock holds
 // the latest full block, blockFresh flags it, all guarded by audioMutex.
-static RtAudio *audioIn = nullptr;
+static std::unique_ptr<RtAudio> audioIn;
 static unsigned int audioChannels = 0;
 static vector<float> staging;
 static vector<float> readyBlock;
@@ -85,12 +86,11 @@ static int audioCallback(void *outputBuffer, void *inputBuffer, unsigned int nFr
 // channels, else mono), preferring SRATE and falling back to the device's
 // first supported rate. Returns false if the device can't provide input.
 bool openAudio(unsigned int deviceId) {
-    audioIn = new RtAudio();
+    audioIn = std::make_unique<RtAudio>();
     RtAudio::DeviceInfo info = audioIn->getDeviceInfo(deviceId);
     if (info.inputChannels == 0) {
         printf("Selected device has no input channels.\n");
-        delete audioIn;
-        audioIn = nullptr;
+        audioIn.reset();
         return false;
     }
     audioChannels = info.inputChannels >= 2 ? 2 : 1;
@@ -118,16 +118,14 @@ bool openAudio(unsigned int deviceId) {
         sampleRate, &bufferFrames, &audioCallback);
     if (err != RTAUDIO_NO_ERROR) {
         printf("Could not open audio stream: %s\n", audioIn->getErrorText().c_str());
-        delete audioIn;
-        audioIn = nullptr;
+        audioIn.reset();
         return false;
     }
     err = audioIn->startStream();
     if (err != RTAUDIO_NO_ERROR) {
         printf("Could not start audio stream: %s\n", audioIn->getErrorText().c_str());
         audioIn->closeStream();
-        delete audioIn;
-        audioIn = nullptr;
+        audioIn.reset();
         return false;
     }
 
@@ -147,8 +145,7 @@ void closeAudio() {
         if (audioIn->isStreamOpen()) {
             audioIn->closeStream();
         }
-        delete audioIn;
-        audioIn = nullptr;
+        audioIn.reset();
     }
     audioRunning = false;
 }

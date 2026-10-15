@@ -1,6 +1,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <memory>
 #include <vector>
 
 #include <raylib.h>
@@ -17,8 +18,69 @@ float alphaVal = 1.0;
 // ---- Visualizer control ----
 
 Visualizer *currentViz = NULL;
-vector<Visualizer *> visualizers;
 vector<Texture2D> overlays;
+
+struct VizDef {
+    int key;
+    const char *frag;
+    int tex0 = -1;
+    int tex1 = -1;
+    int tex2 = -1;
+};
+
+struct VizEntry {
+    int key;
+    std::unique_ptr<Visualizer> viz;
+};
+
+static const VizDef vizTable[] = {
+    { KEY_ONE, "shaders/rgb_flares_in_tunnel.fs" },
+    { KEY_TWO, "shaders/sparkling_sine_wave.fs" },
+    { KEY_THREE, "shaders/sparkling_blocks.fs" },
+    { KEY_FOUR, "shaders/flare_wave.fs" },
+    { KEY_FIVE, "shaders/red_blue_crawl_pattern.fs" },
+    { KEY_SIX, "shaders/raymarch_tunnel.fs" },
+    { KEY_SEVEN, "shaders/discofloor_ceiling.fs" },
+    { KEY_EIGHT, "shaders/flare_tunnel.fs" },
+    { KEY_NINE, "shaders/raymarch_fractal3d.fs" },
+    { KEY_ZERO, "shaders/raymarch_lines_zoom.fs" },
+    { KEY_Q, "shaders/hex_twist_field.fs" },
+    { KEY_W, "shaders/discoball.fs" },
+    { KEY_E, "shaders/cube_array.fs" },
+    { KEY_R, "shaders/planed_fly.fs" },
+    { KEY_T, "shaders/planed_relief_tun.fs" },
+    { KEY_Y, "shaders/planed_square_tun.fs" },
+    { KEY_U, "shaders/hex_tunnel.fs" },
+    { KEY_I, "shaders/rm_cubescape.fs" },
+    { KEY_O, "shaders/a_lot_of_spheres.fs" },
+    { KEY_P, "shaders/fractal_gears.fs" },
+    { KEY_A, "shaders/inversion_machine.fs" },
+    { KEY_S, "shaders/menger_journey.fs" },
+    { KEY_D, "shaders/metaballs.fs" },
+    { KEY_F, "shaders/particle_tracing.fs" },
+    { KEY_G, "shaders/flying_cubes.fs" },
+    { KEY_H, "shaders/spaceship.fs" },
+    { KEY_J, "shaders/space_rings.fs" },
+    { KEY_K, "shaders/hologram.fs" },
+    { KEY_L, "shaders/music_ball.fs" },
+    { KEY_Z, "shaders/led_spectrum.fs" },
+    { KEY_X, "shaders/2dkifs.fs" },
+    { KEY_C, "shaders/planed_tunnel_effect.fs" },
+    { KEY_V, "shaders/noxious_box.fs" },
+    { KEY_B, "shaders/wave_floor.fs" },
+    { KEY_N, "shaders/hex_field.fs" },
+    { KEY_M, "shaders/space_race.fs" },
+    { KEY_LEFT_BRACKET, "shaders/truchet_tentacles.fs" },
+    { KEY_RIGHT_BRACKET, "shaders/circle_pattern.fs", 0 },
+    { KEY_SEMICOLON, "shaders/fire.fs" },
+    { KEY_APOSTROPHE, "shaders/dubstepmyass.fs" },
+    { KEY_MINUS, "shaders/voxel_edges.fs", 1, 3, 2 },
+    { KEY_EQUAL, "shaders/noise_blur.fs" },
+};
+
+static std::vector<VizEntry> roster;
+static std::vector<Texture2D> fxTextures;
+static std::unique_ptr<BeatEngine> beat;
 
 // Overlay PNGs, in Shift+1..6 order.
 // PNGs are stored top-row-first; flip on load so bottom-left-origin UVs
@@ -40,7 +102,7 @@ static void loadOverlays() {
     overlays.push_back(loadPngFlipped("png/LAFOLOGO.png"));
 }
 
-Visualizer *overlayImage;
+static std::unique_ptr<Visualizer> overlayImage;
 Visualizer *targetViz = NULL;
 
 float transition_timer = 0.0;
@@ -68,9 +130,12 @@ bool manualOverride = false;
 
 // Pick a random visualizer; seeds currentViz on first call.
 void vizRandom() {
-    int nextViz = (int)floor(((float)rand() / (float)RAND_MAX)*visualizers.size());
-    if (nextViz > (int)visualizers.size() - 1) nextViz = (int)visualizers.size() - 1;
-    targetViz = visualizers[nextViz];
+    if (roster.empty()) {
+        return;
+    }
+    int nextViz = (int)floor(((float)rand() / (float)RAND_MAX)*roster.size());
+    if (nextViz > (int)roster.size() - 1) nextViz = (int)roster.size() - 1;
+    targetViz = roster[nextViz].viz.get();
     if (currentViz == NULL) {
         currentViz = targetViz;
     }
@@ -84,66 +149,6 @@ void transRandom() {
 static bool shiftHeld() {
     return IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
 }
-
-// Map a pressed key to its visualizer; order matches the push_back sequence.
-static Visualizer *vizKey(int key) {
-    switch (key) {
-    case KEY_ONE: return visualizers[0];
-    case KEY_TWO: return visualizers[1];
-    case KEY_THREE: return visualizers[2];
-    case KEY_FOUR: return visualizers[3];
-    case KEY_FIVE: return visualizers[4];
-    case KEY_SIX: return visualizers[5];
-    case KEY_SEVEN: return visualizers[6];
-    case KEY_EIGHT: return visualizers[7];
-    case KEY_NINE: return visualizers[8];
-    case KEY_ZERO: return visualizers[9];
-    case KEY_Q: return visualizers[10];
-    case KEY_W: return visualizers[11];
-    case KEY_E: return visualizers[12];
-    case KEY_R: return visualizers[13];
-    case KEY_T: return visualizers[14];
-    case KEY_Y: return visualizers[15];
-    case KEY_U: return visualizers[16];
-    case KEY_I: return visualizers[17];
-    case KEY_O: return visualizers[18];
-    case KEY_P: return visualizers[19];
-    case KEY_A: return visualizers[20];
-    case KEY_S: return visualizers[21];
-    case KEY_D: return visualizers[22];
-    case KEY_F: return visualizers[23];
-    case KEY_G: return visualizers[24];
-    case KEY_H: return visualizers[25];
-    case KEY_J: return visualizers[26];
-    case KEY_K: return visualizers[27];
-    case KEY_L: return visualizers[28];
-    case KEY_Z: return visualizers[29];
-    case KEY_X: return visualizers[30];
-    case KEY_C: return visualizers[31];
-    case KEY_V: return visualizers[32];
-    case KEY_B: return visualizers[33];
-    case KEY_N: return visualizers[34];
-    case KEY_M: return visualizers[35];
-    case KEY_LEFT_BRACKET: return visualizers[36];
-    case KEY_RIGHT_BRACKET: return visualizers[37];
-    case KEY_SEMICOLON: return visualizers[38];
-    case KEY_APOSTROPHE: return visualizers[39];
-    case KEY_MINUS: return visualizers[40];
-    case KEY_EQUAL: return visualizers[41];
-    default: return NULL;
-    }
-}
-
-static const int vizKeys[] = {
-    KEY_ONE, KEY_TWO, KEY_THREE, KEY_FOUR, KEY_FIVE,
-    KEY_SIX, KEY_SEVEN, KEY_EIGHT, KEY_NINE, KEY_ZERO,
-    KEY_Q, KEY_W, KEY_E, KEY_R, KEY_T, KEY_Y, KEY_U,
-    KEY_I, KEY_O, KEY_P, KEY_A, KEY_S, KEY_D, KEY_F,
-    KEY_G, KEY_H, KEY_J, KEY_K, KEY_L, KEY_Z, KEY_X,
-    KEY_C, KEY_V, KEY_B, KEY_N, KEY_M,
-    KEY_LEFT_BRACKET, KEY_RIGHT_BRACKET,
-    KEY_SEMICOLON, KEY_APOSTROPHE, KEY_MINUS, KEY_EQUAL
-};
 
 // Poll this frame's input. With Shift: overlay image select (1-6) and
 // overlay toggle (0), re-pressing the same image reverses its fade.
@@ -177,9 +182,9 @@ static void pollKeys() {
         if (thisImage != -1) lastImage = thisImage;
     } else {
         Visualizer *tempViz = targetViz;
-        for (int k : vizKeys) {
-            if (IsKeyPressed(k)) {
-                targetViz = vizKey(k);
+        for (auto &e : roster) {
+            if (IsKeyPressed(e.key)) {
+                targetViz = e.viz.get();
                 break;
             }
         }
@@ -191,11 +196,11 @@ static void pollKeys() {
         }
         if (IsKeyPressed(KEY_DOWN)) {
             printf("Low mode\n");
-            det = det_low;
+            beat->det = beat->det_low.get();
         }
         if (IsKeyPressed(KEY_UP)) {
             printf("High mode\n");
-            det = det_high;
+            beat->det = beat->det_high.get();
         }
 
         if (targetViz != tempViz) {
@@ -210,8 +215,33 @@ static void pollKeys() {
 // Upload uniforms and draw one fullscreen viz pass into an offscreen target
 // at render size. Texture bindings happen inside display(), after the shader
 // is active (see Visualizer::bindTextures).
+static void buildRoster() {
+    fxTextures.push_back(loadPngFlipped("png/tex_noise1.png"));
+    fxTextures.push_back(loadPngFlipped("png/tex_noise2.png"));
+    fxTextures.push_back(loadPngFlipped("png/tex_tex06.png"));
+    fxTextures.push_back(loadPngFlipped("png/tex_tex07.png"));
+    currentViz = NULL;
+    targetViz = NULL;
+    roster.clear();
+    for (auto &d : vizTable) {
+        VizEntry e;
+        e.key = d.key;
+        e.viz = std::make_unique<Visualizer>("shaders/vertex_common.vs", d.frag);
+        if (d.tex0 >= 0) {
+            e.viz->setTex0Texture(fxTextures[d.tex0]);
+        }
+        if (d.tex1 >= 0) {
+            e.viz->setTex1Texture(fxTextures[d.tex1]);
+        }
+        if (d.tex2 >= 0) {
+            e.viz->setTex2Texture(fxTextures[d.tex2]);
+        }
+        roster.push_back(std::move(e));
+    }
+}
+
 static void drawVizInto(RenderTexture2D rt, Visualizer *viz, float t, float dt) {
-    viz->updateVariables(t, dt, sample_data, vu->vu_levels, contest);
+    viz->updateVariables(t, dt, sample_data, beat->vu->vu_levels, beat->contest.get());
     BeginTextureMode(rt);
     ClearBackground(BLANK);
     viz->display(VIZ_WIDTH, VIZ_HEIGHT);
@@ -263,65 +293,11 @@ bool runVisualizer(SetupChoice &choice)
 
     applyWindowMode(choice);
 
-    initBD();
+    beat = std::make_unique<BeatEngine>();
 
-    Visualizer vizRgbFlares("shaders/vertex_common.vs", "shaders/rgb_flares_in_tunnel.fs");
-    Visualizer sparklingSine("shaders/vertex_common.vs", "shaders/sparkling_sine_wave.fs");
-    Visualizer sparklingBlocks("shaders/vertex_common.vs", "shaders/sparkling_blocks.fs");
-    Visualizer flareWave("shaders/vertex_common.vs", "shaders/flare_wave.fs");
-    Visualizer rbCrawl("shaders/vertex_common.vs", "shaders/red_blue_crawl_pattern.fs");
-    Visualizer rmTunnel("shaders/vertex_common.vs", "shaders/raymarch_tunnel.fs");
-    Visualizer discoFloor("shaders/vertex_common.vs", "shaders/discofloor_ceiling.fs");
-    Visualizer flareTunnel("shaders/vertex_common.vs", "shaders/flare_tunnel.fs");
-    Visualizer mandelBlob("shaders/vertex_common.vs","shaders/raymarch_fractal3d.fs");
-    Visualizer lineZoom("shaders/vertex_common.vs","shaders/raymarch_lines_zoom.fs");
-    Visualizer hexField("shaders/vertex_common.vs", "shaders/hex_twist_field.fs");
-    Visualizer discoBall("shaders/vertex_common.vs", "shaders/discoball.fs");
-    Visualizer cubeArray("shaders/vertex_common.vs", "shaders/cube_array.fs");
-    Visualizer planeDeformFly("shaders/vertex_common.vs", "shaders/planed_fly.fs");
-    Visualizer planeDeformReliefTunnel("shaders/vertex_common.vs", "shaders/planed_relief_tun.fs");
-    Visualizer planeDeformSquareTunnel("shaders/vertex_common.vs", "shaders/planed_square_tun.fs");
-    Visualizer hexTunnel("shaders/vertex_common.vs", "shaders/hex_tunnel.fs");
-    Visualizer cubeScape("shaders/vertex_common.vs", "shaders/rm_cubescape.fs");
-    Visualizer inversionMachine("shaders/vertex_common.vs", "shaders/inversion_machine.fs");
-    Visualizer mengerJourney("shaders/vertex_common.vs", "shaders/menger_journey.fs");
-    Visualizer aLotOfSpheres("shaders/vertex_common.vs", "shaders/a_lot_of_spheres.fs");
-    Visualizer fractalGears("shaders/vertex_common.vs", "shaders/fractal_gears.fs");
-    Visualizer metaBalls("shaders/vertex_common.vs", "shaders/metaballs.fs");
-    Visualizer particleTracing("shaders/vertex_common.vs", "shaders/particle_tracing.fs");
-    Visualizer flyingCubes("shaders/vertex_common.vs", "shaders/flying_cubes.fs");
-    Visualizer spaceShip("shaders/vertex_common.vs", "shaders/spaceship.fs");
-    Visualizer spaceRings("shaders/vertex_common.vs", "shaders/space_rings.fs");
-    Visualizer hologram("shaders/vertex_common.vs", "shaders/hologram.fs");
-    Visualizer musicBall("shaders/vertex_common.vs", "shaders/music_ball.fs");
-    Visualizer ledSpectrum("shaders/vertex_common.vs", "shaders/led_spectrum.fs");
-    Visualizer kifs2D("shaders/vertex_common.vs", "shaders/2dkifs.fs");
-    Visualizer planeDTunEffect("shaders/vertex_common.vs", "shaders/planed_tunnel_effect.fs");
-    Visualizer noxiousBox("shaders/vertex_common.vs", "shaders/noxious_box.fs");
-    Visualizer waveFloor("shaders/vertex_common.vs", "shaders/wave_floor.fs");
-    Visualizer hexField2("shaders/vertex_common.vs", "shaders/hex_field.fs");
-    Visualizer spaceRace("shaders/vertex_common.vs", "shaders/space_race.fs");
+    buildRoster();
 
-    Texture2D tex_noise = loadPngFlipped("png/tex_noise1.png");
-    Texture2D tex_noise2 = loadPngFlipped("png/tex_noise2.png");
-    Texture2D tex_tex06 = loadPngFlipped("png/tex_tex06.png");
-    Texture2D tex_tex07 = loadPngFlipped("png/tex_tex07.png");
-
-    Visualizer truchetTentacles("shaders/vertex_common.vs", "shaders/truchet_tentacles.fs");
-    Visualizer circlePattern("shaders/vertex_common.vs", "shaders/circle_pattern.fs");
-    circlePattern.setTex0Texture(tex_noise);
-
-    Visualizer fireShader("shaders/vertex_common.vs", "shaders/fire.fs");
-    Visualizer dubstepMyAss("shaders/vertex_common.vs", "shaders/dubstepmyass.fs");
-
-    Visualizer voxelEdges("shaders/vertex_common.vs", "shaders/voxel_edges.fs");
-    voxelEdges.setTex0Texture(tex_noise2);
-    voxelEdges.setTex1Texture(tex_tex07);
-    voxelEdges.setTex2Texture(tex_tex06);
-
-    Visualizer noiseBlur("shaders/vertex_common.vs", "shaders/noise_blur.fs");
-
-    overlayImage = new Visualizer("shaders/vertex_common.vs", "shaders/overlay_image.fs");
+    overlayImage = std::make_unique<Visualizer>("shaders/vertex_common.vs", "shaders/overlay_image.fs");
 
     loadOverlays();
 
@@ -330,49 +306,6 @@ bool runVisualizer(SetupChoice &choice)
     } else if (!openAudio(choice.audioDevice)) {
         printf("Continuing without audio input.\n");
     }
-
-    visualizers.push_back(&vizRgbFlares);
-    visualizers.push_back(&sparklingSine);
-    visualizers.push_back(&sparklingBlocks);
-    visualizers.push_back(&flareWave);
-    visualizers.push_back(&rbCrawl);
-    visualizers.push_back(&rmTunnel);
-    visualizers.push_back(&discoFloor);
-    visualizers.push_back(&flareTunnel);
-    visualizers.push_back(&mandelBlob);
-    visualizers.push_back(&lineZoom);
-    visualizers.push_back(&hexField);
-    visualizers.push_back(&discoBall);
-    visualizers.push_back(&cubeArray);
-    visualizers.push_back(&planeDeformFly);
-    visualizers.push_back(&planeDeformReliefTunnel);
-    visualizers.push_back(&planeDeformSquareTunnel);
-    visualizers.push_back(&hexTunnel);
-    visualizers.push_back(&cubeScape);
-    visualizers.push_back(&aLotOfSpheres);
-    visualizers.push_back(&fractalGears);
-    visualizers.push_back(&inversionMachine);
-    visualizers.push_back(&mengerJourney);
-    visualizers.push_back(&metaBalls);
-    visualizers.push_back(&particleTracing);
-    visualizers.push_back(&flyingCubes);
-    visualizers.push_back(&spaceShip);
-    visualizers.push_back(&spaceRings);
-    visualizers.push_back(&hologram);
-    visualizers.push_back(&musicBall);
-    visualizers.push_back(&ledSpectrum);
-    visualizers.push_back(&kifs2D);
-    visualizers.push_back(&planeDTunEffect);
-    visualizers.push_back(&noxiousBox);
-    visualizers.push_back(&waveFloor);
-    visualizers.push_back(&hexField2);
-    visualizers.push_back(&spaceRace);
-    visualizers.push_back(&truchetTentacles);
-    visualizers.push_back(&circlePattern);
-    visualizers.push_back(&fireShader);
-    visualizers.push_back(&dubstepMyAss);
-    visualizers.push_back(&voxelEdges);
-    visualizers.push_back(&noiseBlur);
 
     vizRandom();
     transRandom();
@@ -394,7 +327,7 @@ bool runVisualizer(SetupChoice &choice)
         float t = (float)GetTime();
 
         captureAudio();
-        processBD(t, dt);
+        beat->process(t, dt);
 
         pollKeys();
 
@@ -488,7 +421,7 @@ bool runVisualizer(SetupChoice &choice)
         bool showOverlay = overlayEnabled || overlayAlpha != 0.0f;
         if (showOverlay) {
             overlayImage->setBlendAlpha(overlayAlpha);
-            overlayImage->updateVariables(t, dt, sample_data, vu->vu_levels, contest);
+            overlayImage->updateVariables(t, dt, sample_data, beat->vu->vu_levels, beat->contest.get());
             BeginTextureMode(rtOverlay);
             ClearBackground(BLANK);
             overlayImage->display(VIZ_WIDTH, VIZ_HEIGHT);
@@ -578,26 +511,17 @@ bool runVisualizer(SetupChoice &choice)
         UnloadTexture(tex);
     }
     overlays.clear();
-    UnloadTexture(tex_noise);
-    UnloadTexture(tex_noise2);
-    UnloadTexture(tex_tex06);
-    UnloadTexture(tex_tex07);
-    for (auto *viz : visualizers) {
-        viz->unload();
+    for (auto &tex : fxTextures) {
+        UnloadTexture(tex);
     }
-    visualizers.clear();
+    fxTextures.clear();
+    for (auto &e : roster) {
+        e.viz->unload();
+    }
+    roster.clear();
     overlayImage->unload();
-    delete overlayImage;
-    overlayImage = NULL;
-    delete det_low;
-    delete det_high;
-    delete vu;
-    delete contest;
-    det_low = NULL;
-    det_high = NULL;
-    det = NULL;
-    vu = NULL;
-    contest = NULL;
+    overlayImage.reset();
+    beat.reset();
 
     return toMenu;
 }

@@ -5,33 +5,25 @@
 
 using namespace std;
 
-BeatDetektor *det_low;
-BeatDetektor *det_high;
-BeatDetektor *det;
-BeatDetektorVU *vu;
-BeatDetektorContest *contest;
-
 static vector<float> fft_collapse;
 
-// ---- Beat detection ----
-
 // Create the low/high-range detectors, VU follower, and BPM contest.
-void initBD() {
-    det_low = new BeatDetektor(90,160);
-    det_high = new BeatDetektor(140, 260);
+BeatEngine::BeatEngine() {
+    det_low = std::make_unique<BeatDetektor>(90,160);
+    det_high = std::make_unique<BeatDetektor>(140, 260);
 
-    det = det_low;
+    det = det_low.get();
 
-    vu = new BeatDetektorVU();
+    vu = std::make_unique<BeatDetektorVU>();
 
-    contest = new BeatDetektorContest();
+    contest = std::make_unique<BeatDetektorContest>();
     contest->no_contest_decay = false;
     contest->finish_line = 1000;
 }
 
 // Feed both detectors the low/high 256-sample FFT windows, run the contest
 // on the selected range, and update VU levels from the winning BPM.
-void processBD(float timer_seconds, float dt) {
+void BeatEngine::process(float timer_seconds, float dt) {
     if (fft_collapse.size() != 512) {
         fft_collapse.resize(512);
     }
@@ -53,4 +45,3 @@ void processBD(float timer_seconds, float dt) {
 
     contest->run();
 }
-
