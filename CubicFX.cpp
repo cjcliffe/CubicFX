@@ -334,13 +334,23 @@ vector<Visualizer *> visualizers;
 vector<Texture2D> overlays;
 
 // Overlay PNGs, in Shift+1..6 order.
+// PNGs are stored top-row-first; flip on load so bottom-left-origin UVs
+// (gl_FragCoord / resolution) sample them upright, matching the original.
+static Texture2D loadPngFlipped(const char *path) {
+    Image img = LoadImage(path);
+    ImageFlipVertical(&img);
+    Texture2D tex = LoadTextureFromImage(img);
+    UnloadImage(img);
+    return tex;
+}
+
 static void loadOverlays() {
-    overlays.push_back(LoadTexture("png/OFFSET.png"));
-    overlays.push_back(LoadTexture("png/JACK.png"));
-    overlays.push_back(LoadTexture("png/synthamesk.png"));
-    overlays.push_back(LoadTexture("png/C64.png"));
-    overlays.push_back(LoadTexture("png/LAFO.png"));
-    overlays.push_back(LoadTexture("png/LAFOLOGO.png"));
+    overlays.push_back(loadPngFlipped("png/OFFSET.png"));
+    overlays.push_back(loadPngFlipped("png/JACK.png"));
+    overlays.push_back(loadPngFlipped("png/synthamesk.png"));
+    overlays.push_back(loadPngFlipped("png/C64.png"));
+    overlays.push_back(loadPngFlipped("png/LAFO.png"));
+    overlays.push_back(loadPngFlipped("png/LAFOLOGO.png"));
 }
 
 Visualizer *overlayImage;
@@ -942,10 +952,10 @@ static bool runVisualizer(SetupChoice &choice)
     Visualizer hexField2("shaders/vertex_common.vs", "shaders/hex_field.fs");
     Visualizer spaceRace("shaders/vertex_common.vs", "shaders/space_race.fs");
 
-    Texture2D tex_noise = LoadTexture("png/tex_noise1.png");
-    Texture2D tex_noise2 = LoadTexture("png/tex_noise2.png");
-    Texture2D tex_tex06 = LoadTexture("png/tex_tex06.png");
-    Texture2D tex_tex07 = LoadTexture("png/tex_tex07.png");
+    Texture2D tex_noise = loadPngFlipped("png/tex_noise1.png");
+    Texture2D tex_noise2 = loadPngFlipped("png/tex_noise2.png");
+    Texture2D tex_tex06 = loadPngFlipped("png/tex_tex06.png");
+    Texture2D tex_tex07 = loadPngFlipped("png/tex_tex07.png");
 
     Visualizer truchetTentacles("shaders/vertex_common.vs", "shaders/truchet_tentacles.fs");
     Visualizer circlePattern("shaders/vertex_common.vs", "shaders/circle_pattern.fs");
