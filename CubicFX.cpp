@@ -1,6 +1,6 @@
 //
-//  main.cpp
-//  ShaderFX (raylib)
+//  CubicFX.cpp
+//  CubicFX (raylib)
 //
 //  Copyright (c) 2013 Charles J. Cliffe. All rights reserved.
 //
@@ -21,7 +21,7 @@
 #include <raylib.h>
 #include <RtAudio.h>
 
-#include "ShaderViz.h"
+#include "Visualizer.h"
 #include "FFT.h"
 #include "BeatDetektor.h"
 
@@ -242,8 +242,8 @@ void processBD(float timer_seconds, float dt) {
     contest->run();
 }
 
-ShaderViz *currentViz = NULL;
-vector<ShaderViz *> visualizers;
+Visualizer *currentViz = NULL;
+vector<Visualizer *> visualizers;
 vector<Texture2D> overlays;
 
 static void loadOverlays() {
@@ -255,8 +255,8 @@ static void loadOverlays() {
     overlays.push_back(LoadTexture("png/LAFOLOGO.png"));
 }
 
-ShaderViz *overlayImage;
-ShaderViz *targetViz = NULL;
+Visualizer *overlayImage;
+Visualizer *targetViz = NULL;
 
 float transition_timer = 0.0;
 int transition = 0;
@@ -299,7 +299,7 @@ static bool shiftHeld() {
     return IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
 }
 
-static ShaderViz *vizKey(int key) {
+static Visualizer *vizKey(int key) {
     switch (key) {
     case KEY_ONE: return visualizers[0];
     case KEY_TWO: return visualizers[1];
@@ -384,7 +384,7 @@ static void pollKeys() {
 
         if (thisImage != -1) lastImage = thisImage;
     } else {
-        ShaderViz *tempViz = targetViz;
+        Visualizer *tempViz = targetViz;
         for (int k : vizKeys) {
             if (IsKeyPressed(k)) {
                 targetViz = vizKey(k);
@@ -456,7 +456,7 @@ static bool uiButton(Rectangle r, const char *label, bool selected) {
 static bool runSetupDialog(SetupChoice &choice, const vector<AudioDevInfo> &audioDevs) {
     const int dlgW = 660;
     const int dlgH = 720;
-    InitWindow(dlgW, dlgH, "ShaderFX Setup");
+    InitWindow(dlgW, dlgH, "CubicFX Setup");
     SetTargetFPS(60);
 
     int monitorCount = GetMonitorCount();
@@ -480,7 +480,7 @@ static bool runSetupDialog(SetupChoice &choice, const vector<AudioDevInfo> &audi
         BeginDrawing();
         ClearBackground(BLACK);
 
-        DrawText("ShaderFX Setup", 16, (int)y, 28, RAYWHITE);
+        DrawText("CubicFX Setup", 16, (int)y, 28, RAYWHITE);
         y += 40;
 
         DrawText("Display monitor:", 16, (int)y, 20, LIGHTGRAY);
@@ -629,7 +629,7 @@ static bool runSetupDialog(SetupChoice &choice, const vector<AudioDevInfo> &audi
     return !quit;
 }
 
-static void drawVizInto(RenderTexture2D rt, ShaderViz *viz, float t, float dt) {
+static void drawVizInto(RenderTexture2D rt, Visualizer *viz, float t, float dt) {
     viz->updateVariables(t, dt, sample_data, vu->vu_levels, contest);
     BeginTextureMode(rt);
     ClearBackground(BLANK);
@@ -711,67 +711,67 @@ int main(int argc, char * argv[])
         VIZ_WIDTH = choice.width;
         VIZ_HEIGHT = choice.height;
     }
-    SetWindowTitle("BeatDetektor ShaderFX");
+    SetWindowTitle("BeatDetektor CubicFX");
 
     initBD();
 
-    ShaderViz vizRgbFlares("shaders/vertex_common.vs", "shaders/rgb_flares_in_tunnel.fs");
-    ShaderViz sparklingSine("shaders/vertex_common.vs", "shaders/sparkling_sine_wave.fs");
-    ShaderViz sparklingBlocks("shaders/vertex_common.vs", "shaders/sparkling_blocks.fs");
-    ShaderViz flareWave("shaders/vertex_common.vs", "shaders/flare_wave.fs");
-    ShaderViz rbCrawl("shaders/vertex_common.vs", "shaders/red_blue_crawl_pattern.fs");
-    ShaderViz rmTunnel("shaders/vertex_common.vs", "shaders/raymarch_tunnel.fs");
-    ShaderViz discoFloor("shaders/vertex_common.vs", "shaders/discofloor_ceiling.fs");
-    ShaderViz flareTunnel("shaders/vertex_common.vs", "shaders/flare_tunnel.fs");
-    ShaderViz mandelBlob("shaders/vertex_common.vs","shaders/raymarch_fractal3d.fs");
-    ShaderViz lineZoom("shaders/vertex_common.vs","shaders/raymarch_lines_zoom.fs");
-    ShaderViz hexField("shaders/vertex_common.vs", "shaders/hex_twist_field.fs");
-    ShaderViz discoBall("shaders/vertex_common.vs", "shaders/discoball.fs");
-    ShaderViz cubeArray("shaders/vertex_common.vs", "shaders/cube_array.fs");
-    ShaderViz planeDeformFly("shaders/vertex_common.vs", "shaders/planed_fly.fs");
-    ShaderViz planeDeformReliefTunnel("shaders/vertex_common.vs", "shaders/planed_relief_tun.fs");
-    ShaderViz planeDeformSquareTunnel("shaders/vertex_common.vs", "shaders/planed_square_tun.fs");
-    ShaderViz hexTunnel("shaders/vertex_common.vs", "shaders/hex_tunnel.fs");
-    ShaderViz cubeScape("shaders/vertex_common.vs", "shaders/rm_cubescape.fs");
-    ShaderViz inversionMachine("shaders/vertex_common.vs", "shaders/inversion_machine.fs");
-    ShaderViz mengerJourney("shaders/vertex_common.vs", "shaders/menger_journey.fs");
-    ShaderViz aLotOfSpheres("shaders/vertex_common.vs", "shaders/a_lot_of_spheres.fs");
-    ShaderViz fractalGears("shaders/vertex_common.vs", "shaders/fractal_gears.fs");
-    ShaderViz metaBalls("shaders/vertex_common.vs", "shaders/metaballs.fs");
-    ShaderViz particleTracing("shaders/vertex_common.vs", "shaders/particle_tracing.fs");
-    ShaderViz flyingCubes("shaders/vertex_common.vs", "shaders/flying_cubes.fs");
-    ShaderViz spaceShip("shaders/vertex_common.vs", "shaders/spaceship.fs");
-    ShaderViz spaceRings("shaders/vertex_common.vs", "shaders/space_rings.fs");
-    ShaderViz hologram("shaders/vertex_common.vs", "shaders/hologram.fs");
-    ShaderViz musicBall("shaders/vertex_common.vs", "shaders/music_ball.fs");
-    ShaderViz ledSpectrum("shaders/vertex_common.vs", "shaders/led_spectrum.fs");
-    ShaderViz kifs2D("shaders/vertex_common.vs", "shaders/2dkifs.fs");
-    ShaderViz planeDTunEffect("shaders/vertex_common.vs", "shaders/planed_tunnel_effect.fs");
-    ShaderViz noxiousBox("shaders/vertex_common.vs", "shaders/noxious_box.fs");
-    ShaderViz waveFloor("shaders/vertex_common.vs", "shaders/wave_floor.fs");
-    ShaderViz hexField2("shaders/vertex_common.vs", "shaders/hex_field.fs");
-    ShaderViz spaceRace("shaders/vertex_common.vs", "shaders/space_race.fs");
+    Visualizer vizRgbFlares("shaders/vertex_common.vs", "shaders/rgb_flares_in_tunnel.fs");
+    Visualizer sparklingSine("shaders/vertex_common.vs", "shaders/sparkling_sine_wave.fs");
+    Visualizer sparklingBlocks("shaders/vertex_common.vs", "shaders/sparkling_blocks.fs");
+    Visualizer flareWave("shaders/vertex_common.vs", "shaders/flare_wave.fs");
+    Visualizer rbCrawl("shaders/vertex_common.vs", "shaders/red_blue_crawl_pattern.fs");
+    Visualizer rmTunnel("shaders/vertex_common.vs", "shaders/raymarch_tunnel.fs");
+    Visualizer discoFloor("shaders/vertex_common.vs", "shaders/discofloor_ceiling.fs");
+    Visualizer flareTunnel("shaders/vertex_common.vs", "shaders/flare_tunnel.fs");
+    Visualizer mandelBlob("shaders/vertex_common.vs","shaders/raymarch_fractal3d.fs");
+    Visualizer lineZoom("shaders/vertex_common.vs","shaders/raymarch_lines_zoom.fs");
+    Visualizer hexField("shaders/vertex_common.vs", "shaders/hex_twist_field.fs");
+    Visualizer discoBall("shaders/vertex_common.vs", "shaders/discoball.fs");
+    Visualizer cubeArray("shaders/vertex_common.vs", "shaders/cube_array.fs");
+    Visualizer planeDeformFly("shaders/vertex_common.vs", "shaders/planed_fly.fs");
+    Visualizer planeDeformReliefTunnel("shaders/vertex_common.vs", "shaders/planed_relief_tun.fs");
+    Visualizer planeDeformSquareTunnel("shaders/vertex_common.vs", "shaders/planed_square_tun.fs");
+    Visualizer hexTunnel("shaders/vertex_common.vs", "shaders/hex_tunnel.fs");
+    Visualizer cubeScape("shaders/vertex_common.vs", "shaders/rm_cubescape.fs");
+    Visualizer inversionMachine("shaders/vertex_common.vs", "shaders/inversion_machine.fs");
+    Visualizer mengerJourney("shaders/vertex_common.vs", "shaders/menger_journey.fs");
+    Visualizer aLotOfSpheres("shaders/vertex_common.vs", "shaders/a_lot_of_spheres.fs");
+    Visualizer fractalGears("shaders/vertex_common.vs", "shaders/fractal_gears.fs");
+    Visualizer metaBalls("shaders/vertex_common.vs", "shaders/metaballs.fs");
+    Visualizer particleTracing("shaders/vertex_common.vs", "shaders/particle_tracing.fs");
+    Visualizer flyingCubes("shaders/vertex_common.vs", "shaders/flying_cubes.fs");
+    Visualizer spaceShip("shaders/vertex_common.vs", "shaders/spaceship.fs");
+    Visualizer spaceRings("shaders/vertex_common.vs", "shaders/space_rings.fs");
+    Visualizer hologram("shaders/vertex_common.vs", "shaders/hologram.fs");
+    Visualizer musicBall("shaders/vertex_common.vs", "shaders/music_ball.fs");
+    Visualizer ledSpectrum("shaders/vertex_common.vs", "shaders/led_spectrum.fs");
+    Visualizer kifs2D("shaders/vertex_common.vs", "shaders/2dkifs.fs");
+    Visualizer planeDTunEffect("shaders/vertex_common.vs", "shaders/planed_tunnel_effect.fs");
+    Visualizer noxiousBox("shaders/vertex_common.vs", "shaders/noxious_box.fs");
+    Visualizer waveFloor("shaders/vertex_common.vs", "shaders/wave_floor.fs");
+    Visualizer hexField2("shaders/vertex_common.vs", "shaders/hex_field.fs");
+    Visualizer spaceRace("shaders/vertex_common.vs", "shaders/space_race.fs");
 
     Texture2D tex_noise = LoadTexture("png/tex_noise1.png");
     Texture2D tex_noise2 = LoadTexture("png/tex_noise2.png");
     Texture2D tex_tex06 = LoadTexture("png/tex_tex06.png");
     Texture2D tex_tex07 = LoadTexture("png/tex_tex07.png");
 
-    ShaderViz truchetTentacles("shaders/vertex_common.vs", "shaders/truchet_tentacles.fs");
-    ShaderViz circlePattern("shaders/vertex_common.vs", "shaders/circle_pattern.fs");
+    Visualizer truchetTentacles("shaders/vertex_common.vs", "shaders/truchet_tentacles.fs");
+    Visualizer circlePattern("shaders/vertex_common.vs", "shaders/circle_pattern.fs");
     circlePattern.setTex0Texture(tex_noise);
 
-    ShaderViz fireShader("shaders/vertex_common.vs", "shaders/fire.fs");
-    ShaderViz dubstepMyAss("shaders/vertex_common.vs", "shaders/dubstepmyass.fs");
+    Visualizer fireShader("shaders/vertex_common.vs", "shaders/fire.fs");
+    Visualizer dubstepMyAss("shaders/vertex_common.vs", "shaders/dubstepmyass.fs");
 
-    ShaderViz voxelEdges("shaders/vertex_common.vs", "shaders/voxel_edges.fs");
+    Visualizer voxelEdges("shaders/vertex_common.vs", "shaders/voxel_edges.fs");
     voxelEdges.setTex0Texture(tex_noise2);
     voxelEdges.setTex1Texture(tex_tex07);
     voxelEdges.setTex2Texture(tex_tex06);
 
-    ShaderViz noiseBlur("shaders/vertex_common.vs", "shaders/noise_blur.fs");
+    Visualizer noiseBlur("shaders/vertex_common.vs", "shaders/noise_blur.fs");
 
-    overlayImage = new ShaderViz("shaders/vertex_common.vs", "shaders/overlay_image.fs");
+    overlayImage = new Visualizer("shaders/vertex_common.vs", "shaders/overlay_image.fs");
 
     loadOverlays();
 

@@ -1,10 +1,10 @@
 ﻿//
-//  ShaderViz.cpp
+//  Visualizer.cpp
 //
 //  Copyright (c) 2013 Charles J. Cliffe. All rights reserved.
 //
 
-#include "ShaderViz.h"
+#include "Visualizer.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -13,7 +13,7 @@
 int VIZ_WIDTH = 1280;
 int VIZ_HEIGHT = 768;
 
-ShaderViz::ShaderViz(std::string vsFn, std::string fsFn) {
+Visualizer::Visualizer(std::string vsFn, std::string fsFn) {
     timerKick = 0.0f;
     timerMid = 0.0f;
     timerHigh = 0.0f;
@@ -63,27 +63,27 @@ ShaderViz::ShaderViz(std::string vsFn, std::string fsFn) {
     }
 }
 
-void ShaderViz::setOverlayTexture(Texture2D oTex) {
+void Visualizer::setOverlayTexture(Texture2D oTex) {
     overlayTexture = oTex;
     hasOverlay = true;
 }
 
-void ShaderViz::setTex0Texture(Texture2D tex) {
+void Visualizer::setTex0Texture(Texture2D tex) {
     tex0 = tex;
     hasTex0 = true;
 }
 
-void ShaderViz::setTex1Texture(Texture2D tex) {
+void Visualizer::setTex1Texture(Texture2D tex) {
     tex1 = tex;
     hasTex1 = true;
 }
 
-void ShaderViz::setTex2Texture(Texture2D tex) {
+void Visualizer::setTex2Texture(Texture2D tex) {
     tex2 = tex;
     hasTex2 = true;
 }
 
-float ShaderViz::floatArrayAverage(float *data, int start, int end) {
+float Visualizer::floatArrayAverage(float *data, int start, int end) {
     float accum = 0;
     for (int i = start; i < end; i++) {
         accum += data[i];
@@ -93,7 +93,7 @@ float ShaderViz::floatArrayAverage(float *data, int start, int end) {
     return accum;
 }
 
-float ShaderViz::floatArrayAbsAverage(float *data, int start, int end) {
+float Visualizer::floatArrayAbsAverage(float *data, int start, int end) {
     float accum = 0;
     for (int i = start; i < end; i++) {
         accum += fabs(data[i]);
@@ -103,7 +103,7 @@ float ShaderViz::floatArrayAbsAverage(float *data, int start, int end) {
     return accum;
 }
 
-float ShaderViz::floatArrayMax(float *data, int start, int end) {
+float Visualizer::floatArrayMax(float *data, int start, int end) {
     float maxv = 0;
     for (int i = start; i < end; i++) {
         if (data[i] > maxv) maxv = data[i];
@@ -112,11 +112,11 @@ float ShaderViz::floatArrayMax(float *data, int start, int end) {
     return maxv;
 }
 
-void ShaderViz::setBlendAlpha(float val) {
+void Visualizer::setBlendAlpha(float val) {
     blendAlpha = val;
 }
 
-void ShaderViz::updateVariables(float time_value, float dt, std::vector<float> &sample_data, std::vector<float> &vu_data, BeatDetektorContest *contest) {
+void Visualizer::updateVariables(float time_value, float dt, std::vector<float> &sample_data, std::vector<float> &vu_data, BeatDetektorContest *contest) {
     float last_update = dt;
     if (last_update == 0.0f) {
         last_update = 1.0f/60.0f;
@@ -231,7 +231,7 @@ void ShaderViz::updateVariables(float time_value, float dt, std::vector<float> &
     }
 }
 
-void ShaderViz::display(int width, int height)
+void Visualizer::display(int width, int height)
 {
     BeginShaderMode(shader);
     DrawRectangle(0, 0, width, height, WHITE);

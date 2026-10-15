@@ -27,11 +27,11 @@ fetched with shallow clones. No vendored libraries or external checkouts require
 
 ## Run
 
-Launch `ShaderFX` from the build directory so it finds its `shaders/` and `png/`
+Launch `CubicFX` from the build directory so it finds its `shaders/` and `png/`
 asset folders, e.g. from `build/`:
 
 ```bat
-ShaderFX.exe
+CubicFX.exe
 ```
 
 A setup dialog appears first: pick the display monitor, windowed or fullscreen
@@ -39,7 +39,7 @@ mode, window resolution, and audio input device, then press Start (or Enter).
 Command-line arguments can prefill the dialog:
 
 ```
-ShaderFX.exe [monitor] [width height] [autoTimerLimit]
+CubicFX.exe [monitor] [width height] [autoTimerLimit]
 ```
 
 - `monitor` — 1-based display number

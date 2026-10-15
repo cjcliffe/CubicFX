@@ -1,5 +1,5 @@
 //
-//  ShaderViz.h
+//  Visualizer.h
 //
 //  Copyright (c) 2013 Charles J. Cliffe. All rights reserved.
 //
@@ -16,7 +16,7 @@
 extern int VIZ_WIDTH;
 extern int VIZ_HEIGHT;
 
-class ShaderViz {
+class Visualizer {
 public:
     Shader shader;
 
@@ -65,7 +65,7 @@ public:
     Texture2D samplerTexture;
     bool hasSampler;
 
-    ShaderViz(std::string vsFn, std::string fsFn);
+    Visualizer(std::string vsFn, std::string fsFn);
 
     void setOverlayTexture(Texture2D oTex);
     void setTex0Texture(Texture2D tex);

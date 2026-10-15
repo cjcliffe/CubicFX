@@ -35,7 +35,7 @@ macro(configure_files_recurse srcDir destDir)
     endforeach(templateFile)
 endmacro(configure_files_recurse)
 
-project (ShaderFX)
+project (CubicFX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -64,14 +64,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(raylib rtaudio)
 
-SET (shaderfx_sources
-    main.cpp
-    ShaderViz.cpp
+SET (cubicfx_sources
+    CubicFX.cpp
+    Visualizer.cpp
 	BeatDetektor.cpp
 )
 
-SET (shaderfx_headers
-    ShaderViz.h
+SET (cubicfx_headers
+    Visualizer.h
 	FFT.h
 	BeatDetektor.h
 )
@@ -80,12 +80,12 @@ configure_files(${PROJECT_SOURCE_DIR}/shaders ${PROJECT_BINARY_DIR}/shaders COPY
 configure_files(${PROJECT_SOURCE_DIR}/png ${PROJECT_BINARY_DIR}/png COPYONLY)
 
 
-add_executable(ShaderFX ${shaderfx_sources} ${shaderfx_headers})
+add_executable(CubicFX ${cubicfx_sources} ${cubicfx_headers})
 
 if (MSVC)
-    target_compile_definitions(ShaderFX PRIVATE _USE_MATH_DEFINES)
+    target_compile_definitions(CubicFX PRIVATE _USE_MATH_DEFINES)
 endif ()
 
-target_link_libraries(ShaderFX PRIVATE raylib rtaudio)
+target_link_libraries(CubicFX PRIVATE raylib rtaudio)
 
 
