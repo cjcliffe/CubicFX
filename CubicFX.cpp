@@ -1074,10 +1074,7 @@ static bool runVisualizer(SetupChoice &choice)
         }
 
         if (!manualOverride) {
-            alphaVal = 1.0f + (sinf(t*0.115f+50.0f) + cosf(t*0.120f+200.0f) - sinf(100.0f+t*0.132f))/2.0f;
-            if (alphaVal < 0.20f) {
-                alphaVal = 0.20f;
-            }
+            alphaVal = 0.925f + 0.075f * sinf(t*0.9f);
         }
     }
 
