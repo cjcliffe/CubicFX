@@ -456,7 +456,7 @@ static bool uiButton(Rectangle r, const char *label, bool selected) {
 static const int DIALOG_W = 660;
 static const int DIALOG_H = 720;
 
-static bool runSetupDialog(SetupChoice &choice, const vector<AudioDevInfo> &audioDevs) {
+static bool runSetupDialog(SetupChoice &choice, vector<AudioDevInfo> &audioDevs) {
     const int dlgW = DIALOG_W;
     const int dlgH = DIALOG_H;
 
@@ -536,6 +536,21 @@ static bool runSetupDialog(SetupChoice &choice, const vector<AudioDevInfo> &audi
         }
 
         DrawText("Audio input:", 16, (int)y, 20, LIGHTGRAY);
+        if (uiButton({ (float)dlgW - 116, y - 4, 100, 26 }, "Refresh", false)) {
+            unsigned int keepId = choice.audioDevice;
+            audioDevs = listInputDevices();
+            choice.audioIndex = -1;
+            for (int i = 0; i < (int)audioDevs.size(); i++) {
+                if (audioDevs[i].id == keepId) {
+                    choice.audioIndex = i;
+                    break;
+                }
+            }
+            if (choice.audioIndex < 0 && !audioDevs.empty()) {
+                choice.audioIndex = 0;
+            }
+            choice.audioDevice = audioDevs.empty() ? 0 : audioDevs[choice.audioIndex].id;
+        }
         y += 26;
         if (audioDevs.empty()) {
             DrawText("No input devices found.", 16, (int)y, 20, RED);
