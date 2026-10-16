@@ -429,12 +429,15 @@ static std::string readFileText(const std::string &path) {
 
 // Shared flipped-PNG cache so shaders referencing the same asset share one
 // GPU texture. Paths are front-matter asset paths (relative to working dir).
+// Bilinear filtering matters: noise LUT shaders sample neighboring texels
+// and expect smooth interpolation, but raylib loads point-sampled by default.
 static Texture2D cachedPng(const std::string &path) {
     auto it = texCache.find(path);
     if (it != texCache.end()) {
         return it->second;
     }
     Texture2D tex = loadPngFlipped(path.c_str());
+    SetTextureFilter(tex, TEXTURE_FILTER_BILINEAR);
     texCache[path] = tex;
     return tex;
 }

@@ -131,4 +131,7 @@ target_include_directories(VizConfigTest PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(VizConfigTest PRIVATE nlohmann_json::nlohmann_json)
 add_test(NAME VizConfigTest COMMAND VizConfigTest)
 
+add_executable(ShaderSnap tools/shadersnap.cpp)
+target_link_libraries(ShaderSnap PRIVATE raylib)
+
 

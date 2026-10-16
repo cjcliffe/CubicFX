@@ -42,7 +42,9 @@ A single-line form (`// @viz { ... }`) also works for small configs.
 - `tags` — extra search terms for the browser.
 - `textures` — sampler uniform name to image asset path. Paths resolve the
   same way as other runtime assets (relative to the working directory the app
-  runs from). The waveform `samplerTex` texture is managed by the renderer
+  runs from). Textures load vertically flipped (matching the original
+  orientation) with bilinear filtering, which noise LUT shaders depend on.
+  The waveform `samplerTex` texture is managed by the renderer
   and does not need an entry. Any sampler the shader declares can be bound
   this way, so future samplers need no code change.
 - `weight` — relative frequency for random picks. Must be positive.
