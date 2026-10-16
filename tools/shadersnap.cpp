@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -68,6 +69,31 @@ int main(int argc, char **argv) {
     loc = GetShaderLocation(sh, "blendAlpha");
     if (loc >= 0) SetShaderValue(sh, loc, &alpha, SHADER_UNIFORM_FLOAT);
 
+    int locWave = GetShaderLocation(sh, "samplerTex");
+    int locRange = GetShaderLocation(sh, "sampleRange");
+    Texture2D waveTex = { 0 };
+    bool hasWave = false;
+    float waveRange = 0.0f;
+    if (locWave >= 0) {
+        static float dummy[1024];
+        for (int i = 0; i < 1024; i++) {
+            float t = (float)i / 1024.0f;
+            dummy[i] = 0.5f * sinf(t * 6.2831853f * 8.0f)
+                + 0.25f * sinf(t * 6.2831853f * 23.0f)
+                + 0.1f * sinf(t * 6.2831853f * 3.0f);
+            waveRange += fabsf(dummy[i]);
+        }
+        waveRange /= 1024.0f;
+        Image img = GenImageColor(1024, 1, BLANK);
+        ImageFormat(&img, PIXELFORMAT_UNCOMPRESSED_R32);
+        waveTex = LoadTextureFromImage(img);
+        UnloadImage(img);
+        UpdateTexture(waveTex, dummy);
+        SetTextureFilter(waveTex, TEXTURE_FILTER_BILINEAR);
+        hasWave = true;
+    }
+    if (locRange >= 0 && waveRange > 0.0f) SetShaderValue(sh, locRange, &waveRange, SHADER_UNIFORM_FLOAT);
+
     // Image textures the app would bind from the sidecar .json config. A
     // shader with no config falls back to the shared noise image for any
     // tex0-tex2 sampler it declares, so snapshots stay useful.
@@ -101,6 +127,9 @@ int main(int argc, char **argv) {
     for (auto &b : bound) {
         SetShaderValueTexture(sh, GetShaderLocation(sh, b.first.c_str()), b.second);
     }
+    if (hasWave) {
+        SetShaderValueTexture(sh, locWave, waveTex);
+    }
     DrawRectangle(0, 0, 640, 360, WHITE);
     EndShaderMode();
     EndTextureMode();
@@ -112,6 +141,9 @@ int main(int argc, char **argv) {
 
     UnloadImage(snap);
     UnloadRenderTexture(rt);
+    if (hasWave) {
+        UnloadTexture(waveTex);
+    }
     UnloadShader(sh);
     CloseWindow();
     return 0;
