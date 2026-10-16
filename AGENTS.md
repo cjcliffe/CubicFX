@@ -15,6 +15,12 @@ CMake-based (minimum 3.16, C++17). See `CMakeLists.txt` for build configuration.
 - `src/` — Application source: `main.cpp` (entry, CLI prefill, setup/session loop), `app/` (visualizer session: roster, keyboard control, render-texture transitions), `audio/` (RtAudio capture handed to the render thread under a mutex, `FFT.h`), `beat/` (beat-detection glue plus `BeatDetektor.*`), `ui/` (setup dialog, global raygui theme, `Flex.h`), `viz/` (`Visualizer.cpp/.h`, raylib shader wrapper and per-frame uniforms)
 - `shaders/` — Shared `vertex_common.vs` (raylib-style, transforms by the `mvp` uniform); `visuals/` holds roster shaders in per-collection subfolders with embedded front-matter config; `system/` holds compositor effects; `unused/` stages unadapted shaders. Audio-waveform samplers are `sampler2D` backed by a 1024x1 float texture, not `sampler1D`
 - `png/` — Overlay images and noise/texture inputs loaded at runtime
+- `tools/shadersnap.cpp` — ShaderSnap helper: renders one frame of a visualizer shader offscreen to PNG without launching the app (uniforms get fixed dummy values, `tex0`-`tex2` bind the noise image)
+
+## Verification
+
+- Configure, build, and test via CMake: `cmake -S . -B build`, `cmake --build build --config Release`, `ctest --test-dir build -C Release`
+- Snapshot a shader from the build directory (binaries land at the build root, and relative asset paths must resolve): `.\ShaderSnap.exe shaders/visuals/shadertoy/circle_pattern.fs snap.png [linear|point] [time]`
 
 ## Conventions
 
