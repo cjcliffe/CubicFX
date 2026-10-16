@@ -34,10 +34,11 @@ int main(int argc, char * argv[])
     }
 
     vector<AudioDevInfo> audioDevs = listInputDevices();
-    printf("Available audio devices are:\n");
+    printf("Available audio devices are (* = default):\n");
     for (auto &d : audioDevs) {
-        printf("**%s** (%u in, %u out)%s\n", d.name.c_str(), d.inChannels, d.outChannels,
-            d.isLoopback ? " [loopback]" : "");
+        bool isDefault = d.isLoopback ? d.isDefaultOutput : d.isDefaultInput;
+        printf("**%s** (%u in, %u out)%s%s\n", d.name.c_str(), d.inChannels, d.outChannels,
+            d.isLoopback ? " [loopback]" : "", isDefault ? " *" : "");
     }
 
     SetupChoice choice;

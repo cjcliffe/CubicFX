@@ -279,10 +279,13 @@ bool runSetupDialog(SetupChoice &choice, vector<AudioDevInfo> &audioDevs) {
             labels.reserve(audioDevs.size());
             for (auto &d : audioDevs) {
                 char buf[160];
+                bool isDefault = d.isLoopback ? d.isDefaultOutput : d.isDefaultInput;
                 if (d.isLoopback) {
-                    snprintf(buf, sizeof(buf), "[Desktop] %s (%uch)", shortName(d.name, 32).c_str(), d.inChannels);
+                    snprintf(buf, sizeof(buf), "[Desktop] %s (%uch)%s", shortName(d.name, 32).c_str(), d.inChannels,
+                        isDefault ? " *" : "");
                 } else {
-                    snprintf(buf, sizeof(buf), "%s (%uch)", shortName(d.name, 40).c_str(), d.inChannels);
+                    snprintf(buf, sizeof(buf), "%s (%uch)%s", shortName(d.name, 40).c_str(), d.inChannels,
+                        isDefault ? " *" : "");
                 }
                 labels.push_back(buf);
             }
