@@ -25,6 +25,10 @@ unsigned int audioDefaultInputDevice() {
     return RtAudio().getDefaultInputDevice();
 }
 
+unsigned int audioDefaultOutputDevice() {
+    return RtAudio().getDefaultOutputDevice();
+}
+
 // ---- Audio capture ----
 // RtAudio delivers input on its own callback thread; the render thread picks
 // up complete blocks. staging accumulates callback samples, readyBlock holds
@@ -37,14 +41,22 @@ static bool blockFresh = false;
 static bool audioRunning = false;
 static mutex audioMutex;
 
-// List every device with at least one input channel, for the setup dialog.
+// List every usable capture source, for the setup dialog. Physical inputs
+// expose inputChannels; render endpoints expose only outputChannels and
+// are offered as loopback ("Desktop Audio") sources: RtAudio's WASAPI
+// backend captures them with AUDCLNT_STREAMFLAGS_LOOPBACK when a render
+// device is opened as input.
 vector<AudioDevInfo> listInputDevices() {
     vector<AudioDevInfo> devs;
     RtAudio probe;
     for (unsigned int id : probe.getDeviceIds()) {
         RtAudio::DeviceInfo info = probe.getDeviceInfo(id);
         if (info.inputChannels > 0) {
-            devs.push_back({ id, info.name, info.inputChannels });
+            devs.push_back({ id, info.name, info.inputChannels, info.outputChannels,
+                false, info.isDefaultInput, info.isDefaultOutput });
+        } else if (info.outputChannels > 0) {
+            devs.push_back({ id, info.name, info.outputChannels, info.outputChannels,
+                true, info.isDefaultInput, info.isDefaultOutput });
         }
     }
     return devs;
@@ -84,16 +96,21 @@ static int audioCallback(void *outputBuffer, void *inputBuffer, unsigned int nFr
 
 // Open a float32 input stream on deviceId (stereo when the device offers 2+
 // channels, else mono), preferring SRATE and falling back to the device's
-// first supported rate. Returns false if the device can't provide input.
+// first supported rate. Render endpoints (no input channels, output
+// channels only) are opened as WASAPI loopback sources; RtAudio enables
+// AUDCLNT_STREAMFLAGS_LOOPBACK for them. Returns false if the device
+// can't provide input or loopback.
 bool openAudio(unsigned int deviceId) {
     audioIn = std::make_unique<RtAudio>();
     RtAudio::DeviceInfo info = audioIn->getDeviceInfo(deviceId);
-    if (info.inputChannels == 0) {
+    bool loopback = (info.inputChannels == 0 && info.outputChannels > 0);
+    if (!loopback && info.inputChannels == 0) {
         printf("Selected device has no input channels.\n");
         audioIn.reset();
         return false;
     }
-    audioChannels = info.inputChannels >= 2 ? 2 : 1;
+    unsigned int sourceChannels = loopback ? info.outputChannels : info.inputChannels;
+    audioChannels = sourceChannels >= 2 ? 2 : 1;
 
     unsigned int sampleRate = SRATE;
     bool rateOk = false;
@@ -133,6 +150,9 @@ bool openAudio(unsigned int deviceId) {
     fft_data.assign(BUF, 0.0f);
     readyBlock.assign(BUF, 0.0f);
     audioRunning = true;
+    if (loopback) {
+        printf("Opened '%s' as desktop-audio loopback (%u ch).\n", info.name.c_str(), audioChannels);
+    }
     return true;
 }
 

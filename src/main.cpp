@@ -34,9 +34,11 @@ int main(int argc, char * argv[])
     }
 
     vector<AudioDevInfo> audioDevs = listInputDevices();
-    printf("Available input devices are:\n");
+    printf("Available audio devices are (* = default):\n");
     for (auto &d : audioDevs) {
-        printf("**%s** (%u in)\n", d.name.c_str(), d.inChannels);
+        bool isDefault = d.isLoopback ? d.isDefaultOutput : d.isDefaultInput;
+        printf("**%s** (%u in, %u out)%s%s\n", d.name.c_str(), d.inChannels, d.outChannels,
+            d.isLoopback ? " [loopback]" : "", isDefault ? " *" : "");
     }
 
     SetupChoice choice;
@@ -50,11 +52,36 @@ int main(int argc, char * argv[])
     }
     if (!audioDevs.empty()) {
         choice.audioDevice = audioDevs[0].id;
+        choice.audioIndex = 0;
+        unsigned int defaultIn = audioDefaultInputDevice();
+        unsigned int defaultOut = audioDefaultOutputDevice();
+        bool found = false;
         for (int i = 0; i < (int)audioDevs.size(); i++) {
-            if (audioDevs[i].id == audioDefaultInputDevice()) {
+            if (audioDevs[i].id == defaultOut && audioDevs[i].isLoopback) {
                 choice.audioIndex = i;
                 choice.audioDevice = audioDevs[i].id;
+                found = true;
                 break;
+            }
+        }
+        if (!found) {
+            for (int i = 0; i < (int)audioDevs.size(); i++) {
+                if (audioDevs[i].isDefaultOutput && audioDevs[i].isLoopback) {
+                    choice.audioIndex = i;
+                    choice.audioDevice = audioDevs[i].id;
+                    found = true;
+                    break;
+                }
+            }
+        }
+        if (!found) {
+            for (int i = 0; i < (int)audioDevs.size(); i++) {
+                if (audioDevs[i].id == defaultIn) {
+                    choice.audioIndex = i;
+                    choice.audioDevice = audioDevs[i].id;
+                    found = true;
+                    break;
+                }
             }
         }
     }

@@ -10,6 +10,10 @@ struct AudioDevInfo {
     unsigned int id;
     std::string name;
     unsigned int inChannels;
+    unsigned int outChannels;
+    bool isLoopback;
+    bool isDefaultInput;
+    bool isDefaultOutput;
 };
 
 extern std::vector<float> sample_data;
@@ -22,4 +26,5 @@ bool openAudio(unsigned int deviceId);
 void closeAudio();
 void captureAudio();
 unsigned int audioDefaultInputDevice();
+unsigned int audioDefaultOutputDevice();
 void audioResetSession(bool agc, bool testTone);
