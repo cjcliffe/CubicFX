@@ -272,14 +272,18 @@ bool runSetupDialog(SetupChoice &choice, vector<AudioDevInfo> &audioDevs) {
             }
         }
         if (audioDevs.empty()) {
-            GuiLabel(col.at(k++), "No input devices found.");
+            GuiLabel(col.at(k++), "No audio devices found.");
         } else {
             Rectangle panel = col.at(k++);
             vector<string> labels;
             labels.reserve(audioDevs.size());
             for (auto &d : audioDevs) {
                 char buf[160];
-                snprintf(buf, sizeof(buf), "%s (%uch)", shortName(d.name, 40).c_str(), d.inChannels);
+                if (d.isLoopback) {
+                    snprintf(buf, sizeof(buf), "[Desktop] %s (%uch)", shortName(d.name, 32).c_str(), d.inChannels);
+                } else {
+                    snprintf(buf, sizeof(buf), "%s (%uch)", shortName(d.name, 40).c_str(), d.inChannels);
+                }
                 labels.push_back(buf);
             }
             vector<char *> ptrs;
