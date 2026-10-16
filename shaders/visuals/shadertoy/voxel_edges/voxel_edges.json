@@ -1,0 +1,10 @@
+{
+  "name": "Voxel Edges",
+  "author": "inigo quilez",
+  "tags": ["voxel", "raymarch"],
+  "textures": {
+    "tex0": "tex_noise2.png",
+    "tex1": "tex_tex07.png",
+    "tex2": "tex_tex06.png"
+  }
+}

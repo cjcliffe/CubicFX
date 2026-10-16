@@ -1,10 +1,3 @@
-// @viz-begin
-// {
-//   "name": "RT Blobs Blur",
-//   "tags": ["feedback"],
-//   "excludeFromAuto": true
-// }
-// @viz-end
 // 704 Remake - @PauloFalcao
 // based on Blank Slate - @P_Malin (http://glsl.heroku.com/e#2540.09)
 //

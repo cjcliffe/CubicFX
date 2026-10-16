@@ -38,7 +38,7 @@ ctest --test-dir build -C Release --output-on-failure
 
 ## Run
 
-Launch `CubicFX` from the build directory so it finds its `shaders/`, `png/`,
+Launch `CubicFX` from the build directory so it finds its `shaders/`, `images/`,
 and `fonts/` asset folders, e.g. from `build/`:
 
 ```bat
@@ -49,16 +49,6 @@ A setup dialog appears first — pick options, then press Start (or Enter).
 `Esc` in the dialog quits.
 
 ![Setup dialog](docs/screenshot_setup.png)
-
-Command-line arguments can prefill the dialog:
-
-```
-CubicFX.exe [monitor] [width height] [autoTimerLimit]
-```
-
-- `monitor` — 1-based display number
-- `width height` — render resolution (applies in both modes)
-- `autoTimerLimit` — seconds before auto-advancing to a random visualizer
 
 ### Setup options
 
@@ -79,9 +69,8 @@ CubicFX.exe [monitor] [width height] [autoTimerLimit]
 - `Left` / `Right` — previous/next visualizer (locks in the choice, stopping auto-advance)
 - `F` or `/` — shader browser: type to filter by name, file, or tag; `Up`/`Down` moves; `Enter`, `Right`, or click locks in the highlight; `Esc` closes
 - `Space` — random visualizer and transition, resumes auto-advance cycling
-- `Shift` + `1`–`6` — overlay image select, `Shift` + `0` — toggle overlay
-- `Up` / `Down` (browser closed) — beat detector high/low range mode
-- `PageUp` / `PageDown` (or `,` / `.`, `Shift` for coarse) — global alpha
+- `Shift` + `1`–`9` — overlay image select, `Shift` + `0` — toggle overlay
+- `PageUp` / `PageDown` (browser closed) — beat detector high/low range mode
 - Double-click — toggle windowed/fullscreen
 - `Esc` — close browser if open, else back to setup (quit from the setup dialog)
 

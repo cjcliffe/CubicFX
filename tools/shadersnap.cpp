@@ -10,8 +10,12 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
+#include <vector>
 
 #include <raylib.h>
+
+#include "viz/VizConfig.h"
 
 int main(int argc, char **argv) {
     if (argc < 3) {
@@ -64,25 +68,38 @@ int main(int argc, char **argv) {
     loc = GetShaderLocation(sh, "blendAlpha");
     if (loc >= 0) SetShaderValue(sh, loc, &alpha, SHADER_UNIFORM_FLOAT);
 
-    // Image textures the app would bind from front-matter config.
-    Texture2D tex[3] = { 0 };
-    const char *names[3] = { "tex0", "tex1", "tex2" };
-    for (int i = 0; i < 3; i++) {
-        if (GetShaderLocation(sh, names[i]) < 0) continue;
-        Image img = LoadImage("png/tex_noise1.png");
+    // Image textures the app would bind from the sidecar .json config. A
+    // shader with no config falls back to the shared noise image for any
+    // tex0-tex2 sampler it declares, so snapshots stay useful.
+    VizConfig cfg = loadVizConfig(frag);
+    std::vector<std::pair<std::string, Texture2D>> bound;
+    auto bindPath = [&](const std::string &uniform, const std::string &path) {
+        if (GetShaderLocation(sh, uniform.c_str()) < 0 || uniform == "samplerTex") {
+            return;
+        }
+        Image img = LoadImage(path.c_str());
         ImageFlipVertical(&img);
-        tex[i] = LoadTextureFromImage(img);
+        Texture2D tex = LoadTextureFromImage(img);
         UnloadImage(img);
-        SetTextureFilter(tex[i], linear ? TEXTURE_FILTER_BILINEAR : TEXTURE_FILTER_POINT);
+        SetTextureFilter(tex, linear ? TEXTURE_FILTER_BILINEAR : TEXTURE_FILTER_POINT);
+        bound.push_back({ uniform, tex });
+    };
+    for (auto &kv : cfg.textures) {
+        bindPath(kv.first, resolveVizTexturePath(frag, kv.second));
+    }
+    if (cfg.textures.empty()) {
+        const char *names[3] = { "tex0", "tex1", "tex2" };
+        for (int i = 0; i < 3; i++) {
+            bindPath(names[i], "images/tex_noise1.png");
+        }
     }
 
     RenderTexture2D rt = LoadRenderTexture(640, 360);
     BeginTextureMode(rt);
     ClearBackground(BLANK);
     BeginShaderMode(sh);
-    for (int i = 0; i < 3; i++) {
-        if (tex[i].id == 0) continue;
-        SetShaderValueTexture(sh, GetShaderLocation(sh, names[i]), tex[i]);
+    for (auto &b : bound) {
+        SetShaderValueTexture(sh, GetShaderLocation(sh, b.first.c_str()), b.second);
     }
     DrawRectangle(0, 0, 640, 360, WHITE);
     EndShaderMode();

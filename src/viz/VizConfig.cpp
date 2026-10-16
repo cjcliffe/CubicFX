@@ -4,12 +4,17 @@
 
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
 
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
 namespace {
+
+const char *kSharedImageDir = "images";
 
 std::string stemName(const std::string &fragPath) {
     size_t slash = fragPath.find_last_of("/\\");
@@ -26,90 +31,12 @@ std::string stemName(const std::string &fragPath) {
     return base.empty() ? fragPath : base;
 }
 
-// Strip one leading "//" comment marker (plus surrounding whitespace) so the
-// JSON can live inside a comment block without breaking GLSL compilation.
-std::string uncommentLine(const std::string &line) {
-    size_t i = line.find_first_not_of(" \t\r");
-    std::string s = (i == std::string::npos) ? std::string() : line.substr(i);
-    if (s.size() >= 2 && s[0] == '/' && s[1] == '/') {
-        s = s.substr(2);
-        i = s.find_first_not_of(" \t");
-        s = (i == std::string::npos) ? std::string() : s.substr(i);
+std::string sidecarPath(const std::string &fragPath) {
+    size_t dot = fragPath.rfind('.');
+    if (dot == std::string::npos) {
+        return fragPath + ".json";
     }
-    return s;
-}
-
-bool extractBlock(const std::string &fileText, std::string &outJson) {
-    size_t begin = fileText.find("@viz-begin");
-    if (begin == std::string::npos) {
-        return false;
-    }
-    size_t end = fileText.find("@viz-end", begin);
-    if (end == std::string::npos || end <= begin) {
-        return false;
-    }
-    size_t lineStart = fileText.find('\n', begin);
-    if (lineStart == std::string::npos || lineStart > end) {
-        return false;
-    }
-    std::string body;
-    size_t pos = lineStart + 1;
-    while (pos < end) {
-        size_t nl = fileText.find('\n', pos);
-        size_t stop = (nl == std::string::npos || nl > end) ? end : nl;
-        body += uncommentLine(fileText.substr(pos, stop - pos));
-        body += '\n';
-        if (nl == std::string::npos || nl >= end) {
-            break;
-        }
-        pos = nl + 1;
-    }
-    outJson = body;
-    return true;
-}
-
-// Single-line form: // @viz { ... } — brace match honors strings/escapes.
-bool extractInline(const std::string &fileText, std::string &outJson) {
-    size_t mark = fileText.find("@viz");
-    if (mark == std::string::npos) {
-        return false;
-    }
-    size_t open = fileText.find('{', mark);
-    size_t lineEnd = fileText.find('\n', mark);
-    if (open == std::string::npos || (lineEnd != std::string::npos && open > lineEnd)) {
-        return false;
-    }
-    bool inStr = false;
-    bool esc = false;
-    int depth = 0;
-    for (size_t i = open; i < fileText.size(); i++) {
-        char c = fileText[i];
-        if (c == '\n') {
-            break;
-        }
-        if (inStr) {
-            if (esc) {
-                esc = false;
-            } else if (c == '\\') {
-                esc = true;
-            } else if (c == '"') {
-                inStr = false;
-            }
-            continue;
-        }
-        if (c == '"') {
-            inStr = true;
-        } else if (c == '{') {
-            depth++;
-        } else if (c == '}') {
-            depth--;
-            if (depth == 0) {
-                outJson = fileText.substr(open, i - open + 1);
-                return true;
-            }
-        }
-    }
-    return false;
+    return fragPath.substr(0, dot) + ".json";
 }
 
 } // namespace
@@ -120,16 +47,11 @@ VizConfig vizConfigDefaults(const std::string &fragPath) {
     return cfg;
 }
 
-VizConfig parseVizFrontMatter(const std::string &fileText, const std::string &fragPath) {
+VizConfig parseVizConfigJson(const std::string &jsonText, const std::string &fragPath) {
     VizConfig cfg = vizConfigDefaults(fragPath);
 
-    std::string raw;
-    if (!extractBlock(fileText, raw) && !extractInline(fileText, raw)) {
-        return cfg;
-    }
-
     try {
-        json j = json::parse(raw);
+        json j = json::parse(jsonText);
         if (j.contains("version") && j["version"].is_number_integer()) {
             cfg.version = j["version"].get<int>();
         }
@@ -168,13 +90,33 @@ VizConfig parseVizFrontMatter(const std::string &fileText, const std::string &fr
                 cfg.weight = w;
             }
         }
-        if (j.contains("excludeFromAuto") && j["excludeFromAuto"].is_boolean()) {
-            cfg.excludeFromAuto = j["excludeFromAuto"].get<bool>();
-        }
     } catch (const std::exception &e) {
-        printf("VizConfig: %s: ignoring invalid front-matter (%s)\n", fragPath.c_str(), e.what());
+        printf("VizConfig: %s: ignoring invalid config (%s)\n", fragPath.c_str(), e.what());
         return vizConfigDefaults(fragPath);
     }
 
     return cfg;
+}
+
+VizConfig loadVizConfig(const std::string &fragPath) {
+    std::ifstream in(sidecarPath(fragPath), std::ios::binary);
+    if (!in) {
+        return vizConfigDefaults(fragPath);
+    }
+    std::ostringstream ss;
+    ss << in.rdbuf();
+    return parseVizConfigJson(ss.str(), fragPath);
+}
+
+std::string resolveVizTexturePath(const std::string &fragPath, const std::string &ref) {
+    if (ref.find_first_of("/\\") == std::string::npos) {
+        std::filesystem::path frag(fragPath);
+        std::filesystem::path local = frag.parent_path() / ref;
+        std::error_code ec;
+        if (std::filesystem::exists(local, ec)) {
+            return local.generic_string();
+        }
+        return (std::filesystem::path(kSharedImageDir) / ref).generic_string();
+    }
+    return ref;
 }

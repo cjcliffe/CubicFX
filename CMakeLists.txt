@@ -106,7 +106,8 @@ SET (cubicfx_headers
 )
 
 configure_files_recurse(${PROJECT_SOURCE_DIR}/shaders ${PROJECT_BINARY_DIR}/shaders COPYONLY)
-configure_files(${PROJECT_SOURCE_DIR}/png ${PROJECT_BINARY_DIR}/png COPYONLY)
+configure_files(${PROJECT_SOURCE_DIR}/images ${PROJECT_BINARY_DIR}/images COPYONLY)
+configure_files(${PROJECT_SOURCE_DIR}/overlay ${PROJECT_BINARY_DIR}/overlay COPYONLY)
 configure_files(${PROJECT_SOURCE_DIR}/fonts ${PROJECT_BINARY_DIR}/fonts COPYONLY)
 
 
@@ -131,7 +132,8 @@ target_include_directories(VizConfigTest PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(VizConfigTest PRIVATE nlohmann_json::nlohmann_json)
 add_test(NAME VizConfigTest COMMAND VizConfigTest)
 
-add_executable(ShaderSnap tools/shadersnap.cpp)
-target_link_libraries(ShaderSnap PRIVATE raylib)
+add_executable(ShaderSnap tools/shadersnap.cpp src/viz/VizConfig.cpp)
+target_include_directories(ShaderSnap PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(ShaderSnap PRIVATE raylib nlohmann_json::nlohmann_json)
 
 

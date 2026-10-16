@@ -1,11 +1,3 @@
-// @viz-begin
-// {
-//   "name": "Flames",
-//   "author": "inigo quilez",
-//   "tags": ["fire", "noise"],
-//   "textures": { "tex0": "png/tex_noise1.png" }
-// }
-// @viz-end
 #version 150
 out vec4 outputF;
 

@@ -1,10 +1,3 @@
-// @viz-begin
-// {
-//   "name": "Color Spiral Complex 4",
-//   "tags": ["feedback"],
-//   "excludeFromAuto": true
-// }
-// @viz-end
 #ifdef GL_ES
 precision mediump float;
 #endif

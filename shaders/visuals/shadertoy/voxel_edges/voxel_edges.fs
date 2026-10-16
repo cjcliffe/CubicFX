@@ -1,15 +1,3 @@
-// @viz-begin
-// {
-//   "name": "Voxel Edges",
-//   "author": "inigo quilez",
-//   "tags": ["voxel", "raymarch"],
-//   "textures": {
-//     "tex0": "png/tex_noise2.png",
-//     "tex1": "png/tex_tex07.png",
-//     "tex2": "png/tex_tex06.png"
-//   }
-// }
-// @viz-end
 #version 150
 out vec4 outputF;
 
