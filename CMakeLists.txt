@@ -68,7 +68,13 @@ FetchContent_Declare(
     GIT_TAG master
     GIT_SHALLOW TRUE
 )
-FetchContent_MakeAvailable(raylib rtaudio)
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.3
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(raylib rtaudio nlohmann_json)
 FetchContent_GetProperties(raygui)
 if(NOT raygui_POPULATED)
     FetchContent_Populate(raygui)
@@ -83,6 +89,7 @@ SET (cubicfx_sources
     src/ui/SetupDialog.cpp
     src/ui/UiStyle.cpp
     src/viz/Visualizer.cpp
+    src/viz/VizConfig.cpp
 )
 
 SET (cubicfx_headers
@@ -95,9 +102,10 @@ SET (cubicfx_headers
     src/ui/UiStyle.h
     src/ui/Flex.h
     src/viz/Visualizer.h
+    src/viz/VizConfig.h
 )
 
-configure_files(${PROJECT_SOURCE_DIR}/shaders ${PROJECT_BINARY_DIR}/shaders COPYONLY)
+configure_files_recurse(${PROJECT_SOURCE_DIR}/shaders ${PROJECT_BINARY_DIR}/shaders COPYONLY)
 configure_files(${PROJECT_SOURCE_DIR}/png ${PROJECT_BINARY_DIR}/png COPYONLY)
 configure_files(${PROJECT_SOURCE_DIR}/fonts ${PROJECT_BINARY_DIR}/fonts COPYONLY)
 
@@ -110,12 +118,17 @@ if (MSVC)
     target_compile_definitions(CubicFX PRIVATE _USE_MATH_DEFINES)
 endif ()
 
-target_link_libraries(CubicFX PRIVATE raylib rtaudio)
+target_link_libraries(CubicFX PRIVATE raylib rtaudio nlohmann_json::nlohmann_json)
 
 enable_testing()
 add_executable(FlexTest tests/FlexTest.cpp)
 target_include_directories(FlexTest PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(FlexTest PRIVATE raylib)
 add_test(NAME FlexTest COMMAND FlexTest)
+
+add_executable(VizConfigTest tests/VizConfigTest.cpp src/viz/VizConfig.cpp)
+target_include_directories(VizConfigTest PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(VizConfigTest PRIVATE nlohmann_json::nlohmann_json)
+add_test(NAME VizConfigTest COMMAND VizConfigTest)
 
 

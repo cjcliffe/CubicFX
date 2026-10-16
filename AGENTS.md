@@ -13,7 +13,7 @@ CMake-based (minimum 3.16, C++17). See `CMakeLists.txt` for build configuration.
 ## Key Directories
 
 - `src/` — Application source: `main.cpp` (entry, CLI prefill, setup/session loop), `app/` (visualizer session: roster, keyboard control, render-texture transitions), `audio/` (RtAudio capture handed to the render thread under a mutex, `FFT.h`), `beat/` (beat-detection glue plus `BeatDetektor.*`), `ui/` (setup dialog, global raygui theme, `Flex.h`), `viz/` (`Visualizer.cpp/.h`, raylib shader wrapper and per-frame uniforms)
-- `shaders/` — Shared `vertex_common.vs` (raylib-style, transforms by the `mvp` uniform) plus many `.fs` effects; `GLSL_Heroku/` holds additional effects. Audio-waveform samplers are `sampler2D` backed by a 1024x1 float texture, not `sampler1D`
+- `shaders/` — Shared `vertex_common.vs` (raylib-style, transforms by the `mvp` uniform); `visuals/` holds roster shaders in per-collection subfolders with embedded front-matter config; `system/` holds compositor effects; `unused/` stages unadapted shaders. Audio-waveform samplers are `sampler2D` backed by a 1024x1 float texture, not `sampler1D`
 - `png/` — Overlay images and noise/texture inputs loaded at runtime
 
 ## Conventions

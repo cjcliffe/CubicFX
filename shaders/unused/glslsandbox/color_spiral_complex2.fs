@@ -1,7 +1,13 @@
+// @viz-begin
+// {
+//   "name": "Color Spiral Complex 2",
+//   "tags": ["feedback"],
+//   "excludeFromAuto": true
+// }
+// @viz-end
 #ifdef GL_ES
-precision mediump float;
+precision highp float;
 #endif
-
 uniform float time;
 uniform vec2 mouse;
 uniform vec2 resolution;
@@ -60,34 +66,14 @@ vec2 mobius(vec2 domain, vec2 zero_pos, vec2 asymptote_pos){
 	return complex_div( domain - zero_pos, domain - asymptote_pos);
 }
 
-/// basically just a lookup from a texture with GL_LINEAR (instead of the active GL_NEAREST method for the backbuffer) resembled in shader code - surely not very efficient, but hey it looks much better and works on Float32 textures too!
-vec4 bilinear(sampler2D sampler, vec2 uv, vec2 resolution){
-	vec2 pixelsize = 1./resolution;
-	vec2 pixel = uv * resolution;
-	vec2 d = pixel - floor(pixel) + 0.5;
-	pixel = (pixel - d)*pixelsize;
-	
-	vec2 h = vec2( pixel.x, pixel.x + pixelsize.x);
-	if(d.x < 0.5)
-		h = vec2( pixel.x, pixel.x - pixelsize.x);
-	
-	vec2 v = vec2( pixel.y, pixel.y + pixelsize.y);
-	if(d.y < 0.5)
-		v = vec2( pixel.y, pixel.y - pixelsize.y);
-	
-	vec4 lowerleft = texture2D(sampler, vec2(h.x, v.x));
-	vec4 upperleft = texture2D(sampler, vec2(h.x, v.y));
-	vec4 lowerright = texture2D(sampler, vec2(h.y, v.x));
-	vec4 upperright = texture2D(sampler, vec2(h.y, v.y));
-	
-	d = abs(d - 0.5);
-	
-	return mix( mix( lowerleft, lowerright, d.x), mix( upperleft, upperright, d.x),	d.y);
-}
+const float Pi = 3.14159;
+const int zoom = 80;
+const float speed = 0.05;
+float fScale = 2.0;
 
 void main(void)
 {
-	// domain map
+		// domain map
 	vec2 uv = gl_FragCoord.xy / resolution.xy;
 	
 	// aspect-ratio correction
@@ -96,41 +82,25 @@ void main(void)
 	vec2 mouse_correct = 0.5 + ( mouse.xy / resolution.xy - 0.5) / aspect.yx;
 		
 	float phase = time*0. + pi*1.;
-	float dist = 0.68;
+	float dist = 1.;
 	vec2 uv_bipolar = mobius(uv_correct, vec2(0.5 - dist*0.5, 0.5), vec2(0.5 + dist*0.5, 0.5));
-	uv_bipolar = spiralzoom(uv_bipolar, vec2(0.), 10., 0.5, 1.0, mouse.yx*vec2(-1.,1.)*10.);
-	//uv_bipolar = vec2(-uv_bipolar.y,uv_bipolar.x); // 90° rotation 
+	uv_bipolar = spiralzoom(uv_bipolar, vec2(0.), 8., 0., 0.9, mouse.yx*vec2(-1.,2.)*4. );
+	uv_bipolar = vec2(-uv_bipolar.y,uv_bipolar.x); // 90ï¿½ rotation 
 	
-	vec2 uv_trace = wrap_flip(uv_bipolar);
-
-
-	vec2 uPos = uv_trace;
-	//suPos -= vec2((resolution.x/resolution.y)/2.0, 0.0);//shift origin to center
 	
-	uPos.x -= 0.5;
-	uPos.y -= 0.5;
+	vec2 p= 0.5 + (wrap_flip(uv_bipolar) - 0.5)*2.;
+	float t = -time*0.5;
 	
-	vec3 color = vec3(0.0);
-	float vertColor = 0.0;
-	for( float i = 0.0; i < 10.0; ++i )
-	{
-		float t = time * (2.5);
+	float ct = t * speed;
 	
-		uPos.y += sin( uPos.x*(i+1.0) + t+i/5.0 ) * 0.1;
-		float fTemp = abs(1.0 / uPos.y / 990.0);
-		vertColor += fTemp;
-		color += vec3( fTemp*(11.0-i)/2.0, fTemp*i/14.0, pow(fTemp,0.99)*4.5 );
+	for(int i=1;i<zoom;i++) {
+		vec2 newp=p;
+		newp.x+=0.25/float(i)*cos(float(i)*p.y+t*cos(ct)*0.3/40.0+0.03*float(i))*fScale+0.0;		
+		newp.y+=0.25/float(i)*cos(float(i)*p.x+t*ct*0.3/50.0+0.03*float(i+10))*fScale+0.0;
+		p=newp;
 	}
+	//p = uv;
 	
-	float foo = 0.86;
-	float bar = 4./256.;
-	float baz = 1.1;
-	float w = -pi/12.;
-	vec2 rot = vec2( cos(w), sin(w));
-	vec2 drop = 0.5 + complex_mul((uv - 0.5)*aspect, rot)*baz/aspect;
-	
-	vec4 dbuff =  bilinear(backbuffer,drop, resolution)*foo - bar;
- 
-	gl_FragColor = mix(color.xyzz, vec4(1),  dbuff * (1. - border(clamp(drop, 0., 1.), 0.25)));
-	gl_FragColor.w = 1.;
+	vec3 col=vec3((10.0*sin(9.0*p.x)),10.0*sin(5.0*p.y),10.0*sin(p.x+p.y)*cos(p.x+p.y));
+	gl_FragColor=vec4(col, 1.0);
 }

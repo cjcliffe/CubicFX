@@ -1,3 +1,11 @@
+// @viz-begin
+// {
+//   "name": "Circle Pattern",
+//   "author": "inigo quilez",
+//   "tags": ["pattern", "noise"],
+//   "textures": { "tex0": "png/tex_noise1.png" }
+// }
+// @viz-end
 #version 150
 out vec4 outputF;
 

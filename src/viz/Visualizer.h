@@ -43,10 +43,6 @@ public:
     int loc_sampleRange;
     int loc_blendAlpha;
     int loc_samplerTex;
-    int loc_overlayImage;
-    int loc_tex0;
-    int loc_tex1;
-    int loc_tex2;
 
     float randColor[3];
     float randColor2[3];
@@ -57,14 +53,15 @@ public:
     float timerHigh;
     float blendAlpha;
 
-    Texture2D overlayTexture;
-    bool hasOverlay;
-    Texture2D tex0;
-    bool hasTex0;
-    Texture2D tex1;
-    bool hasTex1;
-    Texture2D tex2;
-    bool hasTex2;
+    // Image textures bound by sampler uniform name (see VizConfig), resolved
+    // once at construction. The waveform samplerTex is renderer-owned and
+    // handled separately.
+    struct NamedTexture {
+        std::string uniform;
+        int loc;
+        Texture2D tex;
+    };
+    std::vector<NamedTexture> boundTextures;
 
     // Audio waveform texture (1024x1 float), uploaded per frame for the
     // samplerTex shaders.
@@ -73,10 +70,9 @@ public:
 
     Visualizer(std::string vsFn, std::string fsFn);
 
-    void setOverlayTexture(Texture2D oTex);
-    void setTex0Texture(Texture2D tex);
-    void setTex1Texture(Texture2D tex);
-    void setTex2Texture(Texture2D tex);
+    // Bind an image texture to any sampler uniform the shader declares.
+    // Unknown/dead uniforms are ignored.
+    void setNamedTexture(const std::string &uniform, Texture2D tex);
 
     float floatArrayAverage(float *data, int start, int end);
     float floatArrayAbsAverage(float *data, int start, int end);
