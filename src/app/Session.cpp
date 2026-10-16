@@ -4,10 +4,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
-#include <fstream>
 #include <map>
 #include <memory>
-#include <sstream>
 #include <vector>
 
 #include <raylib.h>
@@ -19,8 +17,6 @@
 #include "ui/SetupDialog.h"
 
 using namespace std;
-
-float alphaVal = 1.0;
 
 // ---- Visualizer control ----
 
@@ -37,10 +33,10 @@ static std::vector<VizEntry> roster;
 static std::map<std::string, Texture2D> texCache;
 static std::unique_ptr<BeatEngine> beat;
 
-// Overlay PNGs, in Shift+1..6 order.
-// PNGs are stored top-row-first; flip on load so bottom-left-origin UVs
-// (gl_FragCoord / resolution) sample them upright, matching the original.
-static Texture2D loadPngFlipped(const char *path) {
+// Overlay images, flipped on load. Images are stored top-row-first; flip so
+// bottom-left-origin UVs (gl_FragCoord / resolution) sample them upright,
+// matching the original.
+static Texture2D loadImageFlipped(const char *path) {
     Image img = LoadImage(path);
     ImageFlipVertical(&img);
     Texture2D tex = LoadTextureFromImage(img);
@@ -48,13 +44,88 @@ static Texture2D loadPngFlipped(const char *path) {
     return tex;
 }
 
+// Overlay slots bound to Shift+1..9. The overlay/ folder is scanned at
+// session start and the first files in natural-sort order fill the slots;
+// missing slots stay inactive.
+static const int maxOverlays = 9;
+
+// Natural order so numeric prefixes sort as expected (2 before 10).
+// Comparison is case-insensitive on non-digit runs.
+static bool naturalLess(const std::string &a, const std::string &b) {
+    size_t i = 0, j = 0;
+    while (i < a.size() && j < b.size()) {
+        if (isdigit((unsigned char)a[i]) && isdigit((unsigned char)b[j])) {
+            size_t e = i, f = j;
+            while (e < a.size() && isdigit((unsigned char)a[e])) {
+                e++;
+            }
+            while (f < b.size() && isdigit((unsigned char)b[f])) {
+                f++;
+            }
+            std::string na = a.substr(i, e - i), nb = b.substr(j, f - j);
+            size_t pa = na.find_first_not_of('0'), pb = nb.find_first_not_of('0');
+            std::string ta = (pa == std::string::npos) ? "" : na.substr(pa);
+            std::string tb = (pb == std::string::npos) ? "" : nb.substr(pb);
+            if (ta.size() != tb.size()) {
+                return ta.size() < tb.size();
+            }
+            if (ta != tb) {
+                return ta < tb;
+            }
+            i = e;
+            j = f;
+        } else {
+            char ca = (char)tolower((unsigned char)a[i]);
+            char cb = (char)tolower((unsigned char)b[j]);
+            if (ca != cb) {
+                return ca < cb;
+            }
+            i++;
+            j++;
+        }
+    }
+    return a.size() < b.size();
+}
+
+static bool isOverlayImage(const std::filesystem::path &p) {
+    static const char *exts[] = { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tga", ".qoi", ".dds", ".hdr" };
+    std::string ext = p.extension().string();
+    for (char &c : ext) {
+        c = (char)tolower((unsigned char)c);
+    }
+    for (auto *e : exts) {
+        if (ext == e) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void loadOverlays() {
-    overlays.push_back(loadPngFlipped("png/OFFSET.png"));
-    overlays.push_back(loadPngFlipped("png/JACK.png"));
-    overlays.push_back(loadPngFlipped("png/synthamesk.png"));
-    overlays.push_back(loadPngFlipped("png/C64.png"));
-    overlays.push_back(loadPngFlipped("png/LAFO.png"));
-    overlays.push_back(loadPngFlipped("png/LAFOLOGO.png"));
+    std::vector<std::string> files;
+    std::error_code ec;
+    std::filesystem::directory_iterator it("overlay", ec);
+    if (ec) {
+        printf("loadOverlays: cannot scan overlay/ (%s)\n", ec.message().c_str());
+        return;
+    }
+    for (auto &entry : it) {
+        if (!entry.is_regular_file()) {
+            continue;
+        }
+        if (!isOverlayImage(entry.path())) {
+            continue;
+        }
+        files.push_back(entry.path().generic_string());
+    }
+    std::sort(files.begin(), files.end(), naturalLess);
+    for (auto &f : files) {
+        if ((int)overlays.size() >= maxOverlays) {
+            break;
+        }
+        overlays.push_back(loadImageFlipped(f.c_str()));
+    }
+    printf("loadOverlays: %d overlay images\n", (int)overlays.size());
 }
 
 static std::unique_ptr<Visualizer> overlayImage;
@@ -113,17 +184,13 @@ static void pickIndex(int i, bool lock) {
     }
 }
 
-// Weighted random pick; when forAuto is set, entries flagged excludeFromAuto
-// are skipped. Seeds currentViz on first call.
-static void vizRandomPick(bool forAuto) {
+// Weighted random pick over the whole roster. Seeds currentViz on first call.
+static void vizRandomPick() {
     if (roster.empty()) {
         return;
     }
     double total = 0.0;
     for (auto &e : roster) {
-        if (forAuto && e.config.excludeFromAuto) {
-            continue;
-        }
         total += e.config.weight;
     }
     if (total <= 0.0) {
@@ -132,9 +199,6 @@ static void vizRandomPick(bool forAuto) {
     double r = ((double)rand() / (double)RAND_MAX) * total;
     Visualizer *picked = roster.front().viz.get();
     for (auto &e : roster) {
-        if (forAuto && e.config.excludeFromAuto) {
-            continue;
-        }
         r -= e.config.weight;
         if (r <= 0.0) {
             picked = e.viz.get();
@@ -146,14 +210,6 @@ static void vizRandomPick(bool forAuto) {
     if (currentViz == NULL) {
         currentViz = targetViz;
     }
-}
-
-static void vizRandomAny() {
-    vizRandomPick(false);
-}
-
-static void vizRandomAuto() {
-    vizRandomPick(true);
 }
 
 // Pick a random crossfade/wipe/zoom transition.
@@ -297,22 +353,28 @@ static BrowserLayout browserLayout() {
     return L;
 }
 
-// Poll this frame's input. With Shift: overlay image select (1-6) and
-// overlay toggle (0), re-pressing the same image reverses its fade.
+// Poll this frame's input. With Shift: overlay image select (1-9, keys past
+// the loaded images stay inactive) and overlay toggle (0), re-pressing the
+// same image reverses its fade.
 // Otherwise: Left/Right for prev/next viz, F or / for the shader browser,
-// Space for random viz+transition (clears manual override), Up/Down for the
-// beat-detector range. Any direct viz choice sets manual override, which
-// stops auto-advance and idle alpha.
+// Space for random viz+transition (clears manual override), PageUp/PageDown
+// for the beat-detector range. Any direct viz choice sets manual override, which
+// stops auto-advance.
 static void pollKeys() {
     if (shiftHeld()) {
+        static const int overlayKeys[maxOverlays] = {
+            KEY_ONE, KEY_TWO, KEY_THREE, KEY_FOUR, KEY_FIVE,
+            KEY_SIX, KEY_SEVEN, KEY_EIGHT, KEY_NINE
+        };
         bool doChange = false;
         thisImage = -1;
-        if (IsKeyPressed(KEY_ONE)) { overlayImage->setNamedTexture("overlayImage", overlays[0]); thisImage = 0; doChange = true; }
-        if (IsKeyPressed(KEY_TWO)) { overlayImage->setNamedTexture("overlayImage", overlays[1]); thisImage = 1; doChange = true; }
-        if (IsKeyPressed(KEY_THREE)) { overlayImage->setNamedTexture("overlayImage", overlays[2]); thisImage = 2; doChange = true; }
-        if (IsKeyPressed(KEY_FOUR)) { overlayImage->setNamedTexture("overlayImage", overlays[3]); thisImage = 3; doChange = true; }
-        if (IsKeyPressed(KEY_FIVE)) { overlayImage->setNamedTexture("overlayImage", overlays[4]); thisImage = 4; doChange = true; }
-        if (IsKeyPressed(KEY_SIX)) { overlayImage->setNamedTexture("overlayImage", overlays[5]); thisImage = 5; doChange = true; }
+        for (int k = 0; k < maxOverlays; k++) {
+            if (k < (int)overlays.size() && IsKeyPressed(overlayKeys[k])) {
+                overlayImage->setNamedTexture("overlayImage", overlays[k]);
+                thisImage = k;
+                doChange = true;
+            }
+        }
         if (IsKeyPressed(KEY_ZERO)) {
             overlayEnabled = !overlayEnabled;
             overlayDelta = 0;
@@ -378,7 +440,7 @@ static void pollKeys() {
         }
         if (IsKeyPressed(KEY_SPACE)) {
             browserSetOpen(false);
-            vizRandomAny();
+            vizRandomPick();
             transRandom();
             manualOverride = false;
             autoTimer = 0;
@@ -398,16 +460,16 @@ static void pollKeys() {
             browserSetOpen(true);
         }
         if (IsKeyPressed(KEY_SPACE)) {
-            vizRandomAny();
+            vizRandomPick();
             transRandom();
             manualOverride = false;
             autoTimer = 0;
         }
-        if (IsKeyPressed(KEY_DOWN)) {
+        if (IsKeyPressed(KEY_PAGE_DOWN)) {
             printf("Low mode\n");
             beat->det = beat->det_low.get();
         }
-        if (IsKeyPressed(KEY_UP)) {
+        if (IsKeyPressed(KEY_PAGE_UP)) {
             printf("High mode\n");
             beat->det = beat->det_high.get();
         }
@@ -416,27 +478,17 @@ static void pollKeys() {
 
 // ---- Frame rendering ----
 
-// Read a whole text file; empty string on failure.
-static std::string readFileText(const std::string &path) {
-    std::ifstream in(path, std::ios::binary);
-    if (!in) {
-        return std::string();
-    }
-    std::ostringstream ss;
-    ss << in.rdbuf();
-    return ss.str();
-}
-
-// Shared flipped-PNG cache so shaders referencing the same asset share one
-// GPU texture. Paths are front-matter asset paths (relative to working dir).
-// Bilinear filtering matters: noise LUT shaders sample neighboring texels
-// and expect smooth interpolation, but raylib loads point-sampled by default.
-static Texture2D cachedPng(const std::string &path) {
+// Shared flipped-image cache so shaders referencing the same asset share one
+// GPU texture. Keys are resolved asset paths. Any image format raylib can
+// load may be used. Bilinear filtering matters: noise LUT shaders sample
+// neighboring texels and expect smooth interpolation, but raylib loads
+// point-sampled by default.
+static Texture2D cachedImage(const std::string &path) {
     auto it = texCache.find(path);
     if (it != texCache.end()) {
         return it->second;
     }
-    Texture2D tex = loadPngFlipped(path.c_str());
+    Texture2D tex = loadImageFlipped(path.c_str());
     SetTextureFilter(tex, TEXTURE_FILTER_BILINEAR);
     texCache[path] = tex;
     return tex;
@@ -446,9 +498,10 @@ static Texture2D cachedPng(const std::string &path) {
 // Each collection (shadertoy, glslsandbox, ...) is a subfolder; dropping a .fs
 // anywhere under visuals/ adds it to the roster. System shaders (compositor
 // effects like the image overlay) live in shaders/system/ and are never
-// roster entries. Each shader carries its own config in an embedded
-// front-matter block; shaders without one use defaults. Textures named in
-// the config are bound from the cache.
+// roster entries. Each shader reads an optional sidecar .json matching the
+// .fs name; shaders without one use defaults. Bare texture file names in the
+// config resolve to the shader's folder first, then the shared image folder,
+// so a shader can use a shared image or ship its own alongside the .fs.
 static void buildRoster() {
     currentViz = NULL;
     targetViz = NULL;
@@ -476,13 +529,13 @@ static void buildRoster() {
     for (auto &frag : frags) {
         VizEntry e;
         e.frag = frag;
-        e.config = parseVizFrontMatter(readFileText(frag), frag);
+        e.config = loadVizConfig(frag);
         e.viz = std::make_unique<Visualizer>("shaders/vertex_common.vs", frag);
         for (auto &kv : e.config.textures) {
             if (kv.first == "samplerTex") {
                 continue;
             }
-            e.viz->setNamedTexture(kv.first, cachedPng(kv.second));
+            e.viz->setNamedTexture(kv.first, cachedImage(resolveVizTexturePath(frag, kv.second)));
         }
         roster.push_back(std::move(e));
     }
@@ -573,7 +626,6 @@ bool runVisualizer(SetupChoice &choice)
     overlayEnabled = false;
     autoTimer = 0;
     manualOverride = false;
-    alphaVal = 1.0f;
     browserSetOpen(false);
     audioResetSession(choice.agc, choice.testTone);
 
@@ -598,7 +650,7 @@ bool runVisualizer(SetupChoice &choice)
         printf("Continuing without audio input.\n");
     }
 
-    vizRandomAny();
+    vizRandomPick();
     transRandom();
 
     RenderTexture2D rtCurrent = LoadRenderTexture(VIZ_WIDTH, VIZ_HEIGHT);
@@ -652,24 +704,6 @@ bool runVisualizer(SetupChoice &choice)
             }
         }
 
-        float alphaDir = 0.0f;
-        if (IsKeyDown(KEY_PAGE_DOWN) || IsKeyDown(KEY_COMMA)) {
-            alphaDir = shiftHeld() ? 4.0f : 1.0f;
-        }
-        if (IsKeyDown(KEY_PAGE_UP) || IsKeyDown(KEY_PERIOD)) {
-            alphaDir = shiftHeld() ? -4.0f : -1.0f;
-        }
-        if (alphaDir != 0.0f) {
-            alphaVal += alphaDir*dt*0.1f;
-            if (alphaVal > 1.0f) {
-                alphaVal = 1.0f;
-            }
-            if (alphaVal < 0.05f) {
-                alphaVal = 0.05f;
-            }
-            printf("%f\n", alphaVal);
-        }
-
         // Advance an active crossfade/wipe/zoom; a finished transition hands
         // currentViz over to the target.
         if (currentViz != targetViz) {
@@ -683,14 +717,14 @@ bool runVisualizer(SetupChoice &choice)
         }
 
         if (in_transition) {
-            currentViz->setBlendAlpha((1.0f - transition_timer)*alphaVal);
+            currentViz->setBlendAlpha(1.0f - transition_timer);
             drawVizInto(rtCurrent, currentViz, t, dt);
 
-            targetViz->setBlendAlpha(alphaVal*transition_timer);
+            targetViz->setBlendAlpha(transition_timer);
             drawVizInto(rtTarget, targetViz, t, dt);
         }
         else {
-            currentViz->setBlendAlpha(alphaVal);
+            currentViz->setBlendAlpha(1.0f);
             drawVizInto(rtCurrent, currentViz, t, dt);
         }
 
@@ -796,12 +830,7 @@ bool runVisualizer(SetupChoice &choice)
         if (!in_transition) autoTimer += dt;
         if (autoTimer > autoTimerLimit && !manualOverride) {
             autoTimer = 0;
-            vizRandomAuto();
-        }
-
-        // Idle brightness pulse while no viz was picked manually.
-        if (!manualOverride) {
-            alphaVal = 0.925f + 0.075f * sinf(t*0.9f);
+            vizRandomPick();
         }
     }
 

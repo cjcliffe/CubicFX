@@ -1,0 +1,6 @@
+{
+  "name": "Circle Pattern",
+  "author": "inigo quilez",
+  "tags": ["pattern", "noise"],
+  "textures": { "tex0": "tex_noise1.png" }
+}
