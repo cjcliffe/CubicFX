@@ -24,10 +24,6 @@ Visualizer::Visualizer(std::string vsFn, std::string fsFn) {
     lastBeat = 0;
     randColor[0] = randColor[1] = randColor[2] = 1.0f;
     randColor2[0] = randColor2[1] = randColor2[2] = 1.0f;
-    hasOverlay = false;
-    hasTex0 = false;
-    hasTex1 = false;
-    hasTex2 = false;
     hasSampler = false;
 
     shader = LoadShader(vsFn.c_str(), fsFn.c_str());
@@ -51,10 +47,6 @@ Visualizer::Visualizer(std::string vsFn, std::string fsFn) {
     loc_sampleRange = GetShaderLocation(shader, "sampleRange");
     loc_blendAlpha = GetShaderLocation(shader, "blendAlpha");
     loc_samplerTex = GetShaderLocation(shader, "samplerTex");
-    loc_overlayImage = GetShaderLocation(shader, "overlayImage");
-    loc_tex0 = GetShaderLocation(shader, "tex0");
-    loc_tex1 = GetShaderLocation(shader, "tex1");
-    loc_tex2 = GetShaderLocation(shader, "tex2");
 
     if (loc_samplerTex >= 0) {
         Image img = GenImageColor(1024, 1, BLANK);
@@ -66,24 +58,22 @@ Visualizer::Visualizer(std::string vsFn, std::string fsFn) {
     }
 }
 
-void Visualizer::setOverlayTexture(Texture2D oTex) {
-    overlayTexture = oTex;
-    hasOverlay = true;
-}
-
-void Visualizer::setTex0Texture(Texture2D tex) {
-    tex0 = tex;
-    hasTex0 = true;
-}
-
-void Visualizer::setTex1Texture(Texture2D tex) {
-    tex1 = tex;
-    hasTex1 = true;
-}
-
-void Visualizer::setTex2Texture(Texture2D tex) {
-    tex2 = tex;
-    hasTex2 = true;
+void Visualizer::setNamedTexture(const std::string &uniform, Texture2D tex) {
+    if (uniform == "samplerTex") {
+        return;
+    }
+    int loc = GetShaderLocation(shader, uniform.c_str());
+    if (loc < 0) {
+        return;
+    }
+    for (auto &e : boundTextures) {
+        if (e.uniform == uniform) {
+            e.tex = tex;
+            e.loc = loc;
+            return;
+        }
+    }
+    boundTextures.push_back({ uniform, loc, tex });
 }
 
 float Visualizer::floatArrayAverage(float *data, int start, int end) {
@@ -227,17 +217,8 @@ void Visualizer::bindTextures()
     if (loc_samplerTex >= 0 && hasSampler) {
         SetShaderValueTexture(shader, loc_samplerTex, samplerTexture);
     }
-    if (loc_overlayImage >= 0 && hasOverlay) {
-        SetShaderValueTexture(shader, loc_overlayImage, overlayTexture);
-    }
-    if (loc_tex0 >= 0 && hasTex0) {
-        SetShaderValueTexture(shader, loc_tex0, tex0);
-    }
-    if (loc_tex1 >= 0 && hasTex1) {
-        SetShaderValueTexture(shader, loc_tex1, tex1);
-    }
-    if (loc_tex2 >= 0 && hasTex2) {
-        SetShaderValueTexture(shader, loc_tex2, tex2);
+    for (auto &e : boundTextures) {
+        SetShaderValueTexture(shader, e.loc, e.tex);
     }
 }
 

@@ -1,12 +1,19 @@
+#include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <map>
 #include <memory>
+#include <sstream>
 #include <vector>
 
 #include <raylib.h>
 
 #include "viz/Visualizer.h"
+#include "viz/VizConfig.h"
 #include "audio/AudioCapture.h"
 #include "beat/BeatEngine.h"
 #include "ui/SetupDialog.h"
@@ -20,66 +27,14 @@ float alphaVal = 1.0;
 Visualizer *currentViz = NULL;
 vector<Texture2D> overlays;
 
-struct VizDef {
-    int key;
-    const char *frag;
-    int tex0 = -1;
-    int tex1 = -1;
-    int tex2 = -1;
-};
-
 struct VizEntry {
-    int key;
     std::unique_ptr<Visualizer> viz;
-};
-
-static const VizDef vizTable[] = {
-    { KEY_ONE, "shaders/rgb_flares_in_tunnel.fs" },
-    { KEY_TWO, "shaders/sparkling_sine_wave.fs" },
-    { KEY_THREE, "shaders/sparkling_blocks.fs" },
-    { KEY_FOUR, "shaders/flare_wave.fs" },
-    { KEY_FIVE, "shaders/red_blue_crawl_pattern.fs" },
-    { KEY_SIX, "shaders/raymarch_tunnel.fs" },
-    { KEY_SEVEN, "shaders/discofloor_ceiling.fs" },
-    { KEY_EIGHT, "shaders/flare_tunnel.fs" },
-    { KEY_NINE, "shaders/raymarch_fractal3d.fs" },
-    { KEY_ZERO, "shaders/raymarch_lines_zoom.fs" },
-    { KEY_Q, "shaders/hex_twist_field.fs" },
-    { KEY_W, "shaders/discoball.fs" },
-    { KEY_E, "shaders/cube_array.fs" },
-    { KEY_R, "shaders/planed_fly.fs" },
-    { KEY_T, "shaders/planed_relief_tun.fs" },
-    { KEY_Y, "shaders/planed_square_tun.fs" },
-    { KEY_U, "shaders/hex_tunnel.fs" },
-    { KEY_I, "shaders/rm_cubescape.fs" },
-    { KEY_O, "shaders/a_lot_of_spheres.fs" },
-    { KEY_P, "shaders/fractal_gears.fs" },
-    { KEY_A, "shaders/inversion_machine.fs" },
-    { KEY_S, "shaders/menger_journey.fs" },
-    { KEY_D, "shaders/metaballs.fs" },
-    { KEY_F, "shaders/particle_tracing.fs" },
-    { KEY_G, "shaders/flying_cubes.fs" },
-    { KEY_H, "shaders/spaceship.fs" },
-    { KEY_J, "shaders/space_rings.fs" },
-    { KEY_K, "shaders/hologram.fs" },
-    { KEY_L, "shaders/music_ball.fs" },
-    { KEY_Z, "shaders/led_spectrum.fs" },
-    { KEY_X, "shaders/2dkifs.fs" },
-    { KEY_C, "shaders/planed_tunnel_effect.fs" },
-    { KEY_V, "shaders/noxious_box.fs" },
-    { KEY_B, "shaders/wave_floor.fs" },
-    { KEY_N, "shaders/hex_field.fs" },
-    { KEY_M, "shaders/space_race.fs" },
-    { KEY_LEFT_BRACKET, "shaders/truchet_tentacles.fs" },
-    { KEY_RIGHT_BRACKET, "shaders/circle_pattern.fs", 0 },
-    { KEY_SEMICOLON, "shaders/fire.fs" },
-    { KEY_APOSTROPHE, "shaders/dubstepmyass.fs" },
-    { KEY_MINUS, "shaders/voxel_edges.fs", 1, 3, 2 },
-    { KEY_EQUAL, "shaders/noise_blur.fs" },
+    VizConfig config;
+    std::string frag;
 };
 
 static std::vector<VizEntry> roster;
-static std::vector<Texture2D> fxTextures;
+static std::map<std::string, Texture2D> texCache;
 static std::unique_ptr<BeatEngine> beat;
 
 // Overlay PNGs, in Shift+1..6 order.
@@ -128,17 +83,77 @@ float autoTimer = 0;
 float autoTimerLimit = 30;
 bool manualOverride = false;
 
-// Pick a random visualizer; seeds currentViz on first call.
-void vizRandom() {
+// Last time the target viz changed; drives the now-playing label fade.
+static double lastVizChange = -1e9;
+
+// Index of a viz in the roster, or -1.
+static void transRandom();
+static int rosterIndexOf(Visualizer *viz) {
+    for (int i = 0; i < (int)roster.size(); i++) {
+        if (roster[i].viz.get() == viz) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// Select roster entry i (wrapping). Locking sets manual override, which stops
+// auto-advance until Space resumes random cycling.
+static void pickIndex(int i, bool lock) {
     if (roster.empty()) {
         return;
     }
-    int nextViz = (int)floor(((float)rand() / (float)RAND_MAX)*roster.size());
-    if (nextViz > (int)roster.size() - 1) nextViz = (int)roster.size() - 1;
-    targetViz = roster[nextViz].viz.get();
+    int n = (int)roster.size();
+    i = ((i % n) + n) % n;
+    targetViz = roster[i].viz.get();
+    lastVizChange = GetTime();
+    if (lock) {
+        manualOverride = true;
+        transRandom();
+    }
+}
+
+// Weighted random pick; when forAuto is set, entries flagged excludeFromAuto
+// are skipped. Seeds currentViz on first call.
+static void vizRandomPick(bool forAuto) {
+    if (roster.empty()) {
+        return;
+    }
+    double total = 0.0;
+    for (auto &e : roster) {
+        if (forAuto && e.config.excludeFromAuto) {
+            continue;
+        }
+        total += e.config.weight;
+    }
+    if (total <= 0.0) {
+        return;
+    }
+    double r = ((double)rand() / (double)RAND_MAX) * total;
+    Visualizer *picked = roster.front().viz.get();
+    for (auto &e : roster) {
+        if (forAuto && e.config.excludeFromAuto) {
+            continue;
+        }
+        r -= e.config.weight;
+        if (r <= 0.0) {
+            picked = e.viz.get();
+            break;
+        }
+    }
+    targetViz = picked;
+    lastVizChange = GetTime();
     if (currentViz == NULL) {
         currentViz = targetViz;
     }
+}
+
+static void vizRandomAny() {
+    vizRandomPick(false);
+}
+
+static void vizRandomAuto() {
+    vizRandomPick(true);
 }
 
 // Pick a random crossfade/wipe/zoom transition.
@@ -150,21 +165,154 @@ static bool shiftHeld() {
     return IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
 }
 
+// ---- Shader browser ----
+// Toggle with F or / while no Shift held. Typing filters the roster by name,
+// file, or tag; Up/Down moves, Enter locks in the highlighted viz (manual
+// override), Space resumes random cycling, Esc closes without changing.
+
+static bool browserOpen = false;
+static std::string browserQuery;
+static int browserSel = 0;
+static int browserTop = 0;
+static std::vector<int> browserHits;
+
+static const int browserPage = 12;
+
+static std::string lowerOf(const std::string &s) {
+    std::string out = s;
+    for (char &c : out) {
+        c = (char)tolower((unsigned char)c);
+    }
+    return out;
+}
+
+static void browserRefresh() {
+    browserHits.clear();
+    std::string q = lowerOf(browserQuery);
+    for (int i = 0; i < (int)roster.size(); i++) {
+        std::string hay = lowerOf(roster[i].config.name + " " + roster[i].frag);
+        for (auto &t : roster[i].config.tags) {
+            hay += " " + lowerOf(t);
+        }
+        if (q.empty() || hay.find(q) != std::string::npos) {
+            browserHits.push_back(i);
+        }
+    }
+    if (browserSel >= (int)browserHits.size()) {
+        browserSel = (int)browserHits.size() - 1;
+    }
+    if (browserSel < 0) {
+        browserSel = 0;
+    }
+    int maxTop = (int)browserHits.size() - browserPage;
+    if (maxTop < 0) {
+        maxTop = 0;
+    }
+    if (browserTop > maxTop) {
+        browserTop = maxTop;
+    }
+}
+
+static void browserSetOpen(bool open) {
+    browserOpen = open;
+    if (open) {
+        browserQuery.clear();
+        browserSel = 0;
+        browserTop = 0;
+        browserRefresh();
+    }
+}
+
+// Keep the highlight inside the visible window, moving the window only when
+// the highlight would leave it.
+static void browserEnsureVisible() {
+    if (browserSel < browserTop) {
+        browserTop = browserSel;
+    } else if (browserSel >= browserTop + browserPage) {
+        browserTop = browserSel - browserPage + 1;
+    }
+    if (browserTop < 0) {
+        browserTop = 0;
+    }
+    int maxTop = (int)browserHits.size() - browserPage;
+    if (maxTop < 0) {
+        maxTop = 0;
+    }
+    if (browserTop > maxTop) {
+        browserTop = maxTop;
+    }
+}
+
+static void browserType(int codepoint) {
+    if (codepoint < 32 || codepoint >= 127 || codepoint == ' ') {
+        return;
+    }
+    browserQuery += (char)codepoint;
+    browserSel = 0;
+    browserTop = 0;
+    browserRefresh();
+}
+
+struct BrowserLayout {
+    int px, py, pw, ph;
+    int rowY, rowH;
+    int rows, start;
+};
+
+// Panel geometry shared by drawBrowser() and click hit-testing. Always
+// reserves at least one row so the "(no match)" line never collides with
+// the footer hints.
+static BrowserLayout browserLayout() {
+    BrowserLayout L;
+    int scrW = GetScreenWidth();
+    int scrH = GetScreenHeight();
+    int count = (int)browserHits.size();
+    L.rows = count > browserPage ? browserPage : count;
+    if (L.rows < 1) {
+        L.rows = 1;
+    }
+    L.rowH = 22;
+    L.pw = scrW - 80;
+    if (L.pw > 560) {
+        L.pw = 560;
+    }
+    if (L.pw < 200) {
+        L.pw = scrW - 20;
+    }
+    L.px = 20;
+    L.py = 20;
+    L.ph = 96 + L.rows * L.rowH;
+    if (L.ph > scrH - 40) {
+        L.ph = scrH - 40;
+    }
+    L.rowY = L.py + 64;
+    L.start = browserTop;
+    int maxStart = count - L.rows;
+    if (maxStart < 0) {
+        maxStart = 0;
+    }
+    if (L.start > maxStart) {
+        L.start = maxStart;
+    }
+    return L;
+}
+
 // Poll this frame's input. With Shift: overlay image select (1-6) and
 // overlay toggle (0), re-pressing the same image reverses its fade.
-// Otherwise: visualizer select, Space for random viz+transition (clears
-// manual override), Up/Down for the beat-detector range. Any direct viz
-// choice sets manual override, which stops auto-advance and idle alpha.
+// Otherwise: Left/Right for prev/next viz, F or / for the shader browser,
+// Space for random viz+transition (clears manual override), Up/Down for the
+// beat-detector range. Any direct viz choice sets manual override, which
+// stops auto-advance and idle alpha.
 static void pollKeys() {
     if (shiftHeld()) {
         bool doChange = false;
         thisImage = -1;
-        if (IsKeyPressed(KEY_ONE)) { overlayImage->setOverlayTexture(overlays[0]); thisImage = 0; doChange = true; }
-        if (IsKeyPressed(KEY_TWO)) { overlayImage->setOverlayTexture(overlays[1]); thisImage = 1; doChange = true; }
-        if (IsKeyPressed(KEY_THREE)) { overlayImage->setOverlayTexture(overlays[2]); thisImage = 2; doChange = true; }
-        if (IsKeyPressed(KEY_FOUR)) { overlayImage->setOverlayTexture(overlays[3]); thisImage = 3; doChange = true; }
-        if (IsKeyPressed(KEY_FIVE)) { overlayImage->setOverlayTexture(overlays[4]); thisImage = 4; doChange = true; }
-        if (IsKeyPressed(KEY_SIX)) { overlayImage->setOverlayTexture(overlays[5]); thisImage = 5; doChange = true; }
+        if (IsKeyPressed(KEY_ONE)) { overlayImage->setNamedTexture("overlayImage", overlays[0]); thisImage = 0; doChange = true; }
+        if (IsKeyPressed(KEY_TWO)) { overlayImage->setNamedTexture("overlayImage", overlays[1]); thisImage = 1; doChange = true; }
+        if (IsKeyPressed(KEY_THREE)) { overlayImage->setNamedTexture("overlayImage", overlays[2]); thisImage = 2; doChange = true; }
+        if (IsKeyPressed(KEY_FOUR)) { overlayImage->setNamedTexture("overlayImage", overlays[3]); thisImage = 3; doChange = true; }
+        if (IsKeyPressed(KEY_FIVE)) { overlayImage->setNamedTexture("overlayImage", overlays[4]); thisImage = 4; doChange = true; }
+        if (IsKeyPressed(KEY_SIX)) { overlayImage->setNamedTexture("overlayImage", overlays[5]); thisImage = 5; doChange = true; }
         if (IsKeyPressed(KEY_ZERO)) {
             overlayEnabled = !overlayEnabled;
             overlayDelta = 0;
@@ -180,16 +328,77 @@ static void pollKeys() {
         }
 
         if (thisImage != -1) lastImage = thisImage;
-    } else {
-        Visualizer *tempViz = targetViz;
-        for (auto &e : roster) {
-            if (IsKeyPressed(e.key)) {
-                targetViz = e.viz.get();
-                break;
+    } else if (browserOpen) {
+        int cp;
+        while ((cp = GetCharPressed()) != 0) {
+            browserType(cp);
+        }
+        // NOTE: IsKeyPressedRepeat alone misses single taps (it only fires
+        // while the key is held across frames), so always OR with IsKeyPressed.
+        if ((IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE)) && !browserQuery.empty()) {
+            browserQuery.pop_back();
+            browserSel = 0;
+            browserTop = 0;
+            browserRefresh();
+        }
+        if (IsKeyPressed(KEY_UP) || IsKeyPressedRepeat(KEY_UP)) {
+            browserSel--;
+            if (browserSel < 0 && !browserHits.empty()) {
+                browserSel = (int)browserHits.size() - 1;
+            }
+            browserEnsureVisible();
+        }
+        if (IsKeyPressed(KEY_DOWN) || IsKeyPressedRepeat(KEY_DOWN)) {
+            if (!browserHits.empty()) {
+                browserSel = (browserSel + 1) % (int)browserHits.size();
+            }
+            browserEnsureVisible();
+        }
+        if ((IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || IsKeyPressed(KEY_RIGHT)) && !browserHits.empty()) {
+            pickIndex(browserHits[browserSel], true);
+            autoTimer = 0;
+            browserSetOpen(false);
+        }
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            BrowserLayout L = browserLayout();
+            Vector2 mp = GetMousePosition();
+            for (int r = 0; r < L.rows; r++) {
+                int hi = L.start + r;
+                if (hi >= (int)browserHits.size()) {
+                    break;
+                }
+                float ry = (float)(L.rowY + r * L.rowH);
+                if (mp.x >= (float)L.px && mp.x <= (float)(L.px + L.pw) && mp.y >= ry && mp.y < ry + (float)L.rowH) {
+                    pickIndex(browserHits[hi], true);
+                    autoTimer = 0;
+                    browserSetOpen(false);
+                    break;
+                }
             }
         }
         if (IsKeyPressed(KEY_SPACE)) {
-            vizRandom();
+            browserSetOpen(false);
+            vizRandomAny();
+            transRandom();
+            manualOverride = false;
+            autoTimer = 0;
+        }
+        // Esc while open is handled by the frame loop (closes the browser
+        // instead of leaving to the setup menu).
+    } else {
+        if (IsKeyPressed(KEY_LEFT) || IsKeyPressedRepeat(KEY_LEFT)) {
+            pickIndex(rosterIndexOf(targetViz) - 1, true);
+            autoTimer = 0;
+        }
+        if (IsKeyPressed(KEY_RIGHT) || IsKeyPressedRepeat(KEY_RIGHT)) {
+            pickIndex(rosterIndexOf(targetViz) + 1, true);
+            autoTimer = 0;
+        }
+        if (IsKeyPressed(KEY_F) || IsKeyPressed(KEY_SLASH)) {
+            browserSetOpen(true);
+        }
+        if (IsKeyPressed(KEY_SPACE)) {
+            vizRandomAny();
             transRandom();
             manualOverride = false;
             autoTimer = 0;
@@ -202,42 +411,82 @@ static void pollKeys() {
             printf("High mode\n");
             beat->det = beat->det_high.get();
         }
-
-        if (targetViz != tempViz) {
-            manualOverride = true;
-            transRandom();
-        }
     }
 }
 
 // ---- Frame rendering ----
 
-// Upload uniforms and draw one fullscreen viz pass into an offscreen target
-// at render size. Texture bindings happen inside display(), after the shader
-// is active (see Visualizer::bindTextures).
+// Read a whole text file; empty string on failure.
+static std::string readFileText(const std::string &path) {
+    std::ifstream in(path, std::ios::binary);
+    if (!in) {
+        return std::string();
+    }
+    std::ostringstream ss;
+    ss << in.rdbuf();
+    return ss.str();
+}
+
+// Shared flipped-PNG cache so shaders referencing the same asset share one
+// GPU texture. Paths are front-matter asset paths (relative to working dir).
+// Bilinear filtering matters: noise LUT shaders sample neighboring texels
+// and expect smooth interpolation, but raylib loads point-sampled by default.
+static Texture2D cachedPng(const std::string &path) {
+    auto it = texCache.find(path);
+    if (it != texCache.end()) {
+        return it->second;
+    }
+    Texture2D tex = loadPngFlipped(path.c_str());
+    SetTextureFilter(tex, TEXTURE_FILTER_BILINEAR);
+    texCache[path] = tex;
+    return tex;
+}
+
+// Scan shaders/visuals/ recursively and build the roster in sorted order.
+// Each collection (shadertoy, glslsandbox, ...) is a subfolder; dropping a .fs
+// anywhere under visuals/ adds it to the roster. System shaders (compositor
+// effects like the image overlay) live in shaders/system/ and are never
+// roster entries. Each shader carries its own config in an embedded
+// front-matter block; shaders without one use defaults. Textures named in
+// the config are bound from the cache.
 static void buildRoster() {
-    fxTextures.push_back(loadPngFlipped("png/tex_noise1.png"));
-    fxTextures.push_back(loadPngFlipped("png/tex_noise2.png"));
-    fxTextures.push_back(loadPngFlipped("png/tex_tex06.png"));
-    fxTextures.push_back(loadPngFlipped("png/tex_tex07.png"));
     currentViz = NULL;
     targetViz = NULL;
     roster.clear();
-    for (auto &d : vizTable) {
+
+    std::vector<std::string> frags;
+    std::error_code ec;
+    std::filesystem::recursive_directory_iterator it("shaders/visuals", ec);
+    if (ec) {
+        printf("buildRoster: cannot scan shaders/visuals (%s)\n", ec.message().c_str());
+        return;
+    }
+    for (auto &entry : it) {
+        if (!entry.is_regular_file()) {
+            continue;
+        }
+        auto path = entry.path();
+        if (path.extension() != ".fs") {
+            continue;
+        }
+        frags.push_back(path.generic_string());
+    }
+    std::sort(frags.begin(), frags.end());
+
+    for (auto &frag : frags) {
         VizEntry e;
-        e.key = d.key;
-        e.viz = std::make_unique<Visualizer>("shaders/vertex_common.vs", d.frag);
-        if (d.tex0 >= 0) {
-            e.viz->setTex0Texture(fxTextures[d.tex0]);
-        }
-        if (d.tex1 >= 0) {
-            e.viz->setTex1Texture(fxTextures[d.tex1]);
-        }
-        if (d.tex2 >= 0) {
-            e.viz->setTex2Texture(fxTextures[d.tex2]);
+        e.frag = frag;
+        e.config = parseVizFrontMatter(readFileText(frag), frag);
+        e.viz = std::make_unique<Visualizer>("shaders/vertex_common.vs", frag);
+        for (auto &kv : e.config.textures) {
+            if (kv.first == "samplerTex") {
+                continue;
+            }
+            e.viz->setNamedTexture(kv.first, cachedPng(kv.second));
         }
         roster.push_back(std::move(e));
     }
+    printf("buildRoster: %d visualizers\n", (int)roster.size());
 }
 
 static void drawVizInto(RenderTexture2D rt, Visualizer *viz, float t, float dt) {
@@ -270,6 +519,42 @@ static void applyWindowMode(const SetupChoice &choice) {
     SetWindowTitle("BeatDetektor CubicFX");
 }
 
+// ---- Browser overlay drawing ----
+
+static const char *targetName() {
+    int i = rosterIndexOf(targetViz);
+    return (i >= 0) ? roster[i].config.name.c_str() : "";
+}
+
+static void drawBrowser() {
+    if (!browserOpen) {
+        return;
+    }
+    BrowserLayout L = browserLayout();
+    DrawRectangle(L.px, L.py, L.pw, L.ph, ColorAlpha(BLACK, 0.85f));
+    DrawRectangleLines(L.px, L.py, L.pw, L.ph, ColorAlpha(WHITE, 0.4f));
+    DrawText("Shader browser", L.px + 12, L.py + 10, 20, WHITE);
+    std::string query = std::string("> ") + browserQuery + "_";
+    DrawText(query.c_str(), L.px + 12, L.py + 36, 20, YELLOW);
+    if (browserHits.empty()) {
+        DrawText("(no match)", L.px + 12, L.rowY, 20, GRAY);
+    }
+    for (int r = 0; r < L.rows; r++) {
+        int idx = L.start + r;
+        if (idx >= (int)browserHits.size()) {
+            break;
+        }
+        bool sel = (L.start + r) == browserSel;
+        Color col = sel ? YELLOW : ColorAlpha(WHITE, 0.85f);
+        std::string label = roster[browserHits[idx]].config.name;
+        if (label.size() > 48) {
+            label = label.substr(0, 48);
+        }
+        DrawText(label.c_str(), L.px + 12, L.rowY + r * L.rowH, 20, col);
+    }
+    DrawText("Enter/click lock  Space random  Esc close", L.px + 12, L.py + L.ph - 24, 16, GRAY);
+}
+
 // One visualizer session: reset shared state, apply the window mode, build
 // the viz roster and textures, open audio, then run the frame loop until Esc
 // (returns true = back to setup) or window-close (returns false = quit).
@@ -289,6 +574,7 @@ bool runVisualizer(SetupChoice &choice)
     autoTimer = 0;
     manualOverride = false;
     alphaVal = 1.0f;
+    browserSetOpen(false);
     audioResetSession(choice.agc, choice.testTone);
 
     applyWindowMode(choice);
@@ -296,8 +582,13 @@ bool runVisualizer(SetupChoice &choice)
     beat = std::make_unique<BeatEngine>();
 
     buildRoster();
+    if (roster.empty()) {
+        printf("No shaders found in shaders/visuals; returning to setup.\n");
+        beat.reset();
+        return true;
+    }
 
-    overlayImage = std::make_unique<Visualizer>("shaders/vertex_common.vs", "shaders/overlay_image.fs");
+    overlayImage = std::make_unique<Visualizer>("shaders/vertex_common.vs", "shaders/system/overlay_image.fs");
 
     loadOverlays();
 
@@ -307,7 +598,7 @@ bool runVisualizer(SetupChoice &choice)
         printf("Continuing without audio input.\n");
     }
 
-    vizRandom();
+    vizRandomAny();
     transRandom();
 
     RenderTexture2D rtCurrent = LoadRenderTexture(VIZ_WIDTH, VIZ_HEIGHT);
@@ -354,7 +645,11 @@ bool runVisualizer(SetupChoice &choice)
         }
 
         if (IsKeyPressed(KEY_ESCAPE)) {
-            toMenu = true;
+            if (browserOpen) {
+                browserSetOpen(false);
+            } else {
+                toMenu = true;
+            }
         }
 
         float alphaDir = 0.0f;
@@ -487,12 +782,21 @@ bool runVisualizer(SetupChoice &choice)
             DrawTexturePro(rtOverlay.texture, rtSource, screenDest, rtOrigin, 0.0f, WHITE);
         }
 
+        if (!browserOpen) {
+            float age = (float)(GetTime() - lastVizChange);
+            if (age < 3.0f) {
+                float a = 0.55f * (age < 2.0f ? 1.0f : (3.0f - age));
+                DrawText(targetName(), 12, (int)scrH - 28, 20, ColorAlpha(WHITE, a));
+            }
+        }
+        drawBrowser();
+
         EndDrawing();
 
         if (!in_transition) autoTimer += dt;
         if (autoTimer > autoTimerLimit && !manualOverride) {
             autoTimer = 0;
-            vizRandom();
+            vizRandomAuto();
         }
 
         // Idle brightness pulse while no viz was picked manually.
@@ -511,10 +815,10 @@ bool runVisualizer(SetupChoice &choice)
         UnloadTexture(tex);
     }
     overlays.clear();
-    for (auto &tex : fxTextures) {
-        UnloadTexture(tex);
+    for (auto &kv : texCache) {
+        UnloadTexture(kv.second);
     }
-    fxTextures.clear();
+    texCache.clear();
     for (auto &e : roster) {
         e.viz->unload();
     }

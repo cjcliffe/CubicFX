@@ -1,3 +1,10 @@
+// @viz-begin
+// {
+//   "name": "Color Spiral Complex 3",
+//   "tags": ["feedback"],
+//   "excludeFromAuto": true
+// }
+// @viz-end
 #ifdef GL_ES
 precision mediump float;
 #endif
@@ -99,7 +106,7 @@ void main(void)
 	float dist = 0.68;
 	vec2 uv_bipolar = mobius(uv_correct, vec2(0.5 - dist*0.5, 0.5), vec2(0.5 + dist*0.5, 0.5));
 	uv_bipolar = spiralzoom(uv_bipolar, vec2(0.), 10., -0.5, .50, mouse.yx*vec2(-1.,1.)*10.);
-	//uv_bipolar = vec2(-uv_bipolar.y,uv_bipolar.x); // 90° rotation 
+	//uv_bipolar = vec2(-uv_bipolar.y,uv_bipolar.x); // 90ï¿½ rotation 
 	
 	vec2 uv_trace = wrap_flip(uv_bipolar);
 
