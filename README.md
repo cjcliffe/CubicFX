@@ -26,7 +26,7 @@ cmake --build build --config Release
 ```
 
 Pinned dependencies (see `CMakeLists.txt`): raylib 6.0, RtAudio 6.0.1,
-and raygui (tracking master, header-only),
+nlohmann/json 3.11.3, and raygui (tracking master, header-only),
 fetched with shallow clones. No vendored libraries or external checkouts required.
 
 ## Tests
@@ -76,13 +76,14 @@ CubicFX.exe [monitor] [width height] [autoTimerLimit]
 
 ## Controls
 
-- Visualizer select — number keys, `Q`–`P`, `A`–`M`, brackets, `;` `'` `-` `=`
-- `Space` — random visualizer and transition
+- `Left` / `Right` — previous/next visualizer (locks in the choice, stopping auto-advance)
+- `F` or `/` — shader browser: type to filter by name, file, or tag; `Up`/`Down` moves; `Enter`, `Right`, or click locks in the highlight; `Esc` closes
+- `Space` — random visualizer and transition, resumes auto-advance cycling
 - `Shift` + `1`–`6` — overlay image select, `Shift` + `0` — toggle overlay
-- `Up` / `Down` — beat detector high/low range mode
+- `Up` / `Down` (browser closed) — beat detector high/low range mode
 - `PageUp` / `PageDown` (or `,` / `.`, `Shift` for coarse) — global alpha
 - Double-click — toggle windowed/fullscreen
-- `Esc` — back to setup (quit from the setup dialog)
+- `Esc` — close browser if open, else back to setup (quit from the setup dialog)
 
 ## License
 
