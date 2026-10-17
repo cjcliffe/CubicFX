@@ -99,8 +99,8 @@ void main(void)
 	vec2 uv = gl_FragCoord.xy / resolution.xy;
 	float slowTime = time*0.25;
 
-	float mouse_x = 10.0*sin((slowTime+timerHigh*6.0)/100.0);
-	float mouse_y = 10.0*cos((slowTime+timerKick*8.0)/100.0);
+	float mouse_x = 8.0*sin((slowTime+timerHigh*6.0)/100.0);
+	float mouse_y = 8.0*cos((slowTime+timerKick*8.0)/100.0);
 
 	// aspect-ratio correction
 	vec2 aspect = vec2(1.,resolution.y/resolution.x);
@@ -128,7 +128,7 @@ void main(void)
 	}
 
 	for(float i=0.0; i<1.0;i++){
-	nd =sin(3.14*2.0*pos.y + i*40.5 + (slowTime+timerKick*2.0))*90.3*(pos.y+80.3)+0.5;
+	nd =sin(3.14*2.0*pos.y + i*40.5 + (slowTime+timerKick))*90.3*(pos.y+80.3)+0.5;
 	amnt = 1.0/abs(nd-pos.x)*0.015;
 
 	cbuff += vec4(amnt*0.2, amnt*0.2 , amnt*pos.x, 1.0);
