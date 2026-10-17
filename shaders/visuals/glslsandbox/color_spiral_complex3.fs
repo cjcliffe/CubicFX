@@ -97,16 +97,17 @@ void main(void)
 {
 	// domain map
 	vec2 uv = gl_FragCoord.xy / resolution.xy;
+	float slowTime = time*0.25;
 
-	float mouse_x = 10.0*sin((time+timerHigh*6.0)/100.0);
-	float mouse_y = 10.0*cos((time+timerKick*8.0)/100.0);
+	float mouse_x = 10.0*sin((slowTime+timerHigh*6.0)/100.0);
+	float mouse_y = 10.0*cos((slowTime+timerKick*8.0)/100.0);
 
 	// aspect-ratio correction
 	vec2 aspect = vec2(1.,resolution.y/resolution.x);
 	vec2 uv_correct = 0.5 + (uv -0.5)/ aspect.yx;
 	vec2 mouse_correct = 0.5 + ( vec2(mouse_x,mouse_y) / resolution.xy - 0.5) / aspect.yx;
 
-	float phase = (time+timerKick)*0. + pi*1.;
+	float phase = (slowTime+timerKick)*0. + pi*1.;
 	float dist = 0.68;
 	vec2 uv_bipolar = mobius(uv_correct, vec2(0.5 - dist*0.5, 0.5), vec2(0.5 + dist*0.5, 0.5));
 	uv_bipolar = spiralzoom(uv_bipolar, vec2(0.), 10., -0.5, .50, vec2(mouse_y,mouse_x)*vec2(-1.,1.)*10.);
@@ -120,14 +121,14 @@ void main(void)
 	vec4 cbuff = vec4(0.0);
 
 	for(float i=0.0; i<5.0;i++){
-	nd =sin(3.14*0.8*pos.x + (i*0.1+sin(time+timerMid*5.0)*0.4) + (time+timerMid*5.0))*0.4+0.1 + pos.x;
+	nd =sin(3.14*0.8*pos.x + (i*0.1+sin(slowTime+timerMid*1.25)*0.4) + (slowTime+timerMid*1.25))*0.4+0.1 + pos.x;
 	amnt = 1.0/abs(nd-pos.y)*0.01;
 
 	cbuff += vec4(amnt, amnt*0.3 , amnt*pos.y, 081.0);
 	}
 
 	for(float i=0.0; i<1.0;i++){
-	nd =sin(3.14*2.0*pos.y + i*40.5 + (time+timerKick*8.0))*90.3*(pos.y+80.3)+0.5;
+	nd =sin(3.14*2.0*pos.y + i*40.5 + (slowTime+timerKick*2.0))*90.3*(pos.y+80.3)+0.5;
 	amnt = 1.0/abs(nd-pos.x)*0.015;
 
 	cbuff += vec4(amnt*0.2, amnt*0.2 , amnt*pos.x, 1.0);

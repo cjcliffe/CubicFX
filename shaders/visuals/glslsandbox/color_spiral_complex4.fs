@@ -97,16 +97,17 @@ void main(void)
 {
 	// domain map
 	vec2 uv = gl_FragCoord.xy / resolution.xy;
+	float slowTime = time*0.25;
 
-	float mouse_x = 10.0*sin((time+timerHigh*6.0)/100.0);
-	float mouse_y = 10.0*cos((time+timerKick*8.0)/100.0);
+	float mouse_x = 10.0*sin((slowTime+timerHigh*6.0)/100.0);
+	float mouse_y = 10.0*cos((slowTime+timerKick*8.0)/100.0);
 
 	// aspect-ratio correction
 	vec2 aspect = vec2(1.,resolution.y/resolution.x);
 	vec2 uv_correct = 0.5 + (uv -0.5)/ aspect.yx;
 	vec2 mouse_correct = 0.5 + ( vec2(mouse_x,mouse_y) / resolution.xy - 0.5) / aspect.yx;
 
-	float phase = (time+timerKick)*0. + pi*1.;
+	float phase = (slowTime+timerKick)*0. + pi*1.;
 	float dist = 0.68;
 	vec2 uv_bipolar = mobius(uv_correct, vec2(0.5 - dist*0.5, 0.5), vec2(0.5 + dist*0.5, 0.5));
 	uv_bipolar = spiralzoom(uv_bipolar, vec2(0.), 10., 0.5, 1.0, vec2(mouse_y,mouse_x)*vec2(-1.,1.)*10.);
@@ -125,7 +126,7 @@ void main(void)
 	float vertColor = 0.0;
 	for( float i = 0.0; i < 10.0; ++i )
 	{
-		float t = (time+timerMid*5.0) * (2.5);
+		float t = (slowTime+timerMid*1.25) * (2.5);
 
 		uPos.y += sin( uPos.x*(i+1.0) + t+i/5.0 ) * 0.1;
 		float fTemp = abs(1.0 / uPos.y / 990.0);
