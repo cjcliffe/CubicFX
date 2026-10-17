@@ -7,7 +7,9 @@
 class BeatEngine {
 public:
     BeatEngine();
-    void process(float timer_seconds, float dt);
+    // spectrumFresh marks a new correctly-timed detector block in fft_data;
+    // detectors and contest run only then, VU smoothing runs every frame.
+    void process(float timer_seconds, float dt, bool spectrumFresh);
 
     std::unique_ptr<BeatDetektor> det_low;
     std::unique_ptr<BeatDetektor> det_high;

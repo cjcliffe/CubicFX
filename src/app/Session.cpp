@@ -687,8 +687,8 @@ bool runVisualizer(SetupChoice &choice)
         float dt = GetFrameTime();
         float t = (float)GetTime();
 
-        captureAudio();
-        beat->process(t, dt);
+        bool spectrumFresh = captureAudio(dt);
+        beat->process(t, dt, spectrumFresh);
 
         pollKeys();
 
