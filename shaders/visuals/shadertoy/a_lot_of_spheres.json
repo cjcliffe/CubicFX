@@ -1,0 +1,6 @@
+{
+  "name": "A Lot of Spheres",
+  "author": "Reinder Nijhoff",
+  "description": "Raytraced grid of reflective spheres",
+  "tags": ["raymarch", "spheres"]
+}

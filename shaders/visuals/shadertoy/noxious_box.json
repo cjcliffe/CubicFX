@@ -1,0 +1,6 @@
+{
+  "name": "noxiousBox",
+  "author": "eiffie",
+  "description": "Reflective mandelbox fractal",
+  "tags": ["mandelbox", "raymarch"]
+}

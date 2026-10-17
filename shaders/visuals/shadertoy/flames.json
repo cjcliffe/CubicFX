@@ -1,6 +1,0 @@
-{
-  "name": "Flames",
-  "author": "inigo quilez",
-  "tags": ["fire", "noise"],
-  "textures": { "tex0": "tex_noise1.png" }
-}
