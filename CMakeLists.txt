@@ -114,6 +114,7 @@ SET (cubicfx_headers
     src/app/Session.h
     src/audio/AudioCapture.h
     src/audio/FFT.h
+    src/audio/FrameSlice.h
     src/beat/BeatEngine.h
     src/beat/BeatDetektor.h
     src/ui/SetupDialog.h
@@ -158,6 +159,10 @@ add_test(NAME FeedbackTest COMMAND FeedbackTest)
 add_executable(TransitionTest tests/TransitionTest.cpp)
 target_include_directories(TransitionTest PRIVATE ${PROJECT_SOURCE_DIR}/src)
 add_test(NAME TransitionTest COMMAND TransitionTest)
+
+add_executable(AudioSliceTest tests/AudioSliceTest.cpp)
+target_include_directories(AudioSliceTest PRIVATE ${PROJECT_SOURCE_DIR}/src)
+add_test(NAME AudioSliceTest COMMAND AudioSliceTest)
 
 add_executable(ShaderSnap tools/shadersnap.cpp src/viz/VizConfig.cpp)
 target_include_directories(ShaderSnap PRIVATE ${PROJECT_SOURCE_DIR}/src)
