@@ -52,6 +52,7 @@ Visualizer::Visualizer(std::string vsFn, std::string fsFn) {
     loc_blendAlpha = GetShaderLocation(shader, "blendAlpha");
     loc_samplerTex = GetShaderLocation(shader, "samplerTex");
     loc_backbuffer = GetShaderLocation(shader, "backbuffer");
+    // A declared-but-unsampled backbuffer compiles out to -1 and renders normally.
     hasBackbuffer = loc_backbuffer >= 0;
 
     if (loc_samplerTex >= 0) {
@@ -65,6 +66,7 @@ Visualizer::Visualizer(std::string vsFn, std::string fsFn) {
 }
 
 void Visualizer::setNamedTexture(const std::string &uniform, Texture2D tex) {
+    // Renderer-owned samplers take no image binding.
     if (uniform == "samplerTex" || uniform == "backbuffer") {
         return;
     }
@@ -230,6 +232,8 @@ void Visualizer::bindTextures()
 
 void Visualizer::ensureFeedback()
 {
+    // Fresh targets start cleared so feedback fades in from black; a render
+    // size change reallocates and restarts the feedback.
     if (feedback[0].id != 0 && feedback[0].texture.width == VIZ_WIDTH && feedback[0].texture.height == VIZ_HEIGHT) {
         return;
     }
@@ -263,6 +267,8 @@ void Visualizer::renderFeedback()
     BeginTextureMode(feedback[write]);
     ClearBackground(BLANK);
     BeginShaderMode(shader);
+    // The read target stays bound while drawing into the write target, so a
+    // shader never samples the frame it is writing.
     SetShaderValueTexture(shader, loc_backbuffer, feedback[feedbackRead].texture);
     bindTextures();
     DrawRectangle(0, 0, feedback[write].texture.width, feedback[write].texture.height, WHITE);

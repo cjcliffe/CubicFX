@@ -25,7 +25,7 @@ CMake-based (minimum 3.16, C++17). See `CMakeLists.txt` for build configuration.
 
 ## Conventions
 
-- Do not add comments unless asked
+- Comment code where it aids understanding; the no-commentary guidance in Documentation Guidelines targets editorial commentary in reverse-engineering documents, not regular code
 - License/header facts: most files use `// Copyright (c) 2013 Charles J. Cliffe. All rights reserved.`; `BeatDetektor` files carry their own GPLv3 header. `README.md` states MIT licence intent for the project — do not add SPDX headers or relicense files
 - Many shaders are derivatives of ShaderToy or the old glsl.heroku site and may lack attribution (per `README.md`): do not strip existing attributions, and add one when the source is known
 

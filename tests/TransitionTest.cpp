@@ -2,6 +2,9 @@
 
 #include "viz/Transition.h"
 
+// Transition state machine: normal timed handover plus the rapid
+// back-and-forth retarget that used to freeze the fade halfway.
+
 static int failures = 0;
 
 static void check(bool ok, const char *name) {

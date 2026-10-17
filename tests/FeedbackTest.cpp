@@ -7,6 +7,10 @@
 
 #include "viz/VizConfig.h"
 
+// Feedback-shader contract: every roster visual sampling backbuffer must be
+// tagged, fade with the transition alpha, and need no inputs the renderer
+// never provides.
+
 static int failures = 0;
 
 static void check(bool ok, const char *name) {

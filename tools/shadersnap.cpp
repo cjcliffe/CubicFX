@@ -122,6 +122,8 @@ int main(int argc, char **argv) {
     }
 
     RenderTexture2D rt = LoadRenderTexture(640, 360);
+    // Feedback shaders need accumulated history to snapshot well, so render
+    // a one-second warm-up ending at the requested time.
     int locBack = GetShaderLocation(sh, "backbuffer");
     RenderTexture2D fb[2] = { { 0 }, { 0 } };
     int fbRead = 0;

@@ -71,7 +71,7 @@ void main(void)
 {
 	// domain map
 	vec2 uv = gl_FragCoord.xy / resolution.xy;
-	float slowTime = time*0.25;
+	float slowTime = time*0.25; // Quarter-speed clock for autonomous motion (audio timers unaffected).
 
 	float mouse_x = 10.0*sin((slowTime+timerHigh*6.0)/100.0);
 	float mouse_y = 10.0*cos((slowTime+timerKick*8.0)/100.0);

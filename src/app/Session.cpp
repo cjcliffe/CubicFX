@@ -544,6 +544,8 @@ static void buildRoster() {
 
 static void drawVizInto(RenderTexture2D rt, Visualizer *viz, float t, float dt) {
     viz->updateVariables(t, dt, sample_data, beat->vu->vu_levels, beat->contest.get());
+    // Feedback viz render into their own targets (a nested texture mode
+    // would drop the session target), then blit here like any other frame.
     if (viz->hasBackbuffer) {
         viz->renderFeedback();
         BeginTextureMode(rt);
