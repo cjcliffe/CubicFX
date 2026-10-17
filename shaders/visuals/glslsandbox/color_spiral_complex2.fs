@@ -1,10 +1,12 @@
-#ifdef GL_ES
-precision highp float;
-#endif
+#version 150
+out vec4 outputF;
+
 uniform float time;
-uniform vec2 mouse;
 uniform vec2 resolution;
-uniform sampler2D backbuffer;
+uniform float timerKick;
+uniform float timerMid;
+uniform float timerHigh;
+uniform float vuLow;
 #define pi 3.141592653589793238462643383279
 #define pi_inv 0.318309886183790671537767526745
 #define pi2_inv 0.159154943091895335768883763372
@@ -25,7 +27,7 @@ vec2 complex_div(vec2 numerator, vec2 denominator){
 vec2 wrap_flip(vec2 uv){
 	return vec2(1.)-abs(fract(uv*.5)*2.-1.);
 }
- 
+
 float border(vec2 domain, float thickness){
    vec2 uv = fract(domain-vec2(0.5));
    uv = min(uv,1.-uv)*2.;
@@ -63,37 +65,43 @@ const float Pi = 3.14159;
 const int zoom = 80;
 const float speed = 0.05;
 float fScale = 2.0;
+uniform float blendAlpha;
 
 void main(void)
 {
-		// domain map
+	// domain map
 	vec2 uv = gl_FragCoord.xy / resolution.xy;
-	
+	float slowTime = time*0.25; // Quarter-speed clock for autonomous motion (audio timers unaffected).
+
+	float mouse_x = 10.0*sin((slowTime+timerHigh*6.0)/100.0);
+	float mouse_y = 10.0*cos((slowTime+timerKick*8.0)/100.0);
+
 	// aspect-ratio correction
 	vec2 aspect = vec2(1.,resolution.y/resolution.x);
 	vec2 uv_correct = 0.5 + (uv -0.5)/ aspect.yx;
-	vec2 mouse_correct = 0.5 + ( mouse.xy / resolution.xy - 0.5) / aspect.yx;
-		
-	float phase = time*0. + pi*1.;
+	vec2 mouse_correct = 0.5 + ( vec2(mouse_x,mouse_y) / resolution.xy - 0.5) / aspect.yx;
+
+	float phase = (slowTime+timerKick)*0. + pi*1.;
 	float dist = 1.;
 	vec2 uv_bipolar = mobius(uv_correct, vec2(0.5 - dist*0.5, 0.5), vec2(0.5 + dist*0.5, 0.5));
-	uv_bipolar = spiralzoom(uv_bipolar, vec2(0.), 8., 0., 0.9, mouse.yx*vec2(-1.,2.)*4. );
-	uv_bipolar = vec2(-uv_bipolar.y,uv_bipolar.x); // 90� rotation 
-	
-	
+	uv_bipolar = spiralzoom(uv_bipolar, vec2(0.), 8., 0., 0.9, vec2(mouse_y,mouse_x)*vec2(-1.,2.)*4. );
+	uv_bipolar = vec2(-uv_bipolar.y,uv_bipolar.x); // 90-degree rotation
+
+
 	vec2 p= 0.5 + (wrap_flip(uv_bipolar) - 0.5)*2.;
-	float t = -time*0.5;
-	
+	float t = -(slowTime+timerMid*1.25)*0.5;
+
 	float ct = t * speed;
-	
+
 	for(int i=1;i<zoom;i++) {
 		vec2 newp=p;
-		newp.x+=0.25/float(i)*cos(float(i)*p.y+t*cos(ct)*0.3/40.0+0.03*float(i))*fScale+0.0;		
+		newp.x+=0.25/float(i)*cos(float(i)*p.y+t*cos(ct)*0.3/40.0+0.03*float(i))*fScale+0.0;
 		newp.y+=0.25/float(i)*cos(float(i)*p.x+t*ct*0.3/50.0+0.03*float(i+10))*fScale+0.0;
 		p=newp;
 	}
 	//p = uv;
-	
+
 	vec3 col=vec3((10.0*sin(9.0*p.x)),10.0*sin(5.0*p.y),10.0*sin(p.x+p.y)*cos(p.x+p.y));
-	gl_FragColor=vec4(col, 1.0);
+	outputF=vec4(col, 1.0);
+	outputF.a = blendAlpha;
 }

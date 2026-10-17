@@ -43,6 +43,7 @@ public:
     int loc_sampleRange;
     int loc_blendAlpha;
     int loc_samplerTex;
+    int loc_backbuffer;
 
     float randColor[3];
     float randColor2[3];
@@ -67,6 +68,11 @@ public:
     // samplerTex shaders.
     Texture2D samplerTexture;
     bool hasSampler;
+    // Previous-frame ping-pong targets for shaders declaring backbuffer;
+    // feedbackRead selects the target holding the last finished frame.
+    RenderTexture2D feedback[2];
+    int feedbackRead;
+    bool hasBackbuffer;
 
     Visualizer(std::string vsFn, std::string fsFn);
 
@@ -85,6 +91,12 @@ public:
     // raylib drops sampler registrations on every batch flush, so binding
     // earlier (e.g. in updateVariables) reads back unbound units.
     void display(int width, int height);
+    // Render into the write target with the last frame bound as backbuffer,
+    // then swap; Session blits feedbackTexture() into its own target.
+    void renderFeedback();
+    Texture2D feedbackTexture() const;
+    void ensureFeedback();
+    void releaseFeedback();
 
     void bindTextures();
 

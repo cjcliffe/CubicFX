@@ -10,6 +10,7 @@
 
 #include <raylib.h>
 
+#include "viz/Transition.h"
 #include "viz/Visualizer.h"
 #include "viz/VizConfig.h"
 #include "audio/AudioCapture.h"
@@ -131,8 +132,7 @@ static void loadOverlays() {
 static std::unique_ptr<Visualizer> overlayImage;
 Visualizer *targetViz = NULL;
 
-float transition_timer = 0.0;
-bool in_transition = false;
+TransitionState transition;
 
 enum transitionType {
     TRANS_CROSSFADE,
@@ -544,6 +544,18 @@ static void buildRoster() {
 
 static void drawVizInto(RenderTexture2D rt, Visualizer *viz, float t, float dt) {
     viz->updateVariables(t, dt, sample_data, beat->vu->vu_levels, beat->contest.get());
+    // Feedback viz render into their own targets (a nested texture mode
+    // would drop the session target), then blit here like any other frame.
+    if (viz->hasBackbuffer) {
+        viz->renderFeedback();
+        BeginTextureMode(rt);
+        ClearBackground(BLANK);
+        Rectangle fbSource = { 0, 0, (float)VIZ_WIDTH, -(float)VIZ_HEIGHT };
+        Rectangle fbDest = { 0, 0, (float)VIZ_WIDTH, (float)VIZ_HEIGHT };
+        DrawTexturePro(viz->feedbackTexture(), fbSource, fbDest, Vector2{ 0, 0 }, 0.0f, WHITE);
+        EndTextureMode();
+        return;
+    }
     BeginTextureMode(rt);
     ClearBackground(BLANK);
     viz->display(VIZ_WIDTH, VIZ_HEIGHT);
@@ -624,8 +636,7 @@ bool runVisualizer(SetupChoice &choice)
 {
     currentViz = NULL;
     targetViz = NULL;
-    transition_timer = 0.0f;
-    in_transition = false;
+    transition = TransitionState();
     lastImage = -1;
     thisImage = 0;
     overlayAlpha = 0.0f;
@@ -713,21 +724,13 @@ bool runVisualizer(SetupChoice &choice)
 
         // Advance an active crossfade/wipe/zoom; a finished transition hands
         // currentViz over to the target.
-        if (currentViz != targetViz) {
-            in_transition = true;
-            transition_timer += dt;
-            if (transition_timer > 1.0f) {
-                in_transition = false;
-                transition_timer = 0;
-                currentViz = targetViz;
-            }
-        }
+        advanceTransition(transition, currentViz, targetViz, dt);
 
-        if (in_transition) {
-            currentViz->setBlendAlpha(1.0f - transition_timer);
+        if (transition.inTransition) {
+            currentViz->setBlendAlpha(1.0f - transition.timer);
             drawVizInto(rtCurrent, currentViz, t, dt);
 
-            targetViz->setBlendAlpha(transition_timer);
+            targetViz->setBlendAlpha(transition.timer);
             drawVizInto(rtTarget, targetViz, t, dt);
         }
         else {
@@ -771,8 +774,8 @@ bool runVisualizer(SetupChoice &choice)
         BeginDrawing();
         ClearBackground(BLACK);
 
-        if (in_transition) {
-            float k = transition_timer;
+        if (transition.inTransition) {
+            float k = transition.timer;
             switch (trans_type) {
             case TRANS_CROSSFADE:
                 DrawTexturePro(rtCurrent.texture, rtSource, screenDest, rtOrigin, 0.0f, WHITE);
@@ -836,7 +839,7 @@ bool runVisualizer(SetupChoice &choice)
 
         EndDrawing();
 
-        if (!in_transition) autoTimer += dt;
+        if (!transition.inTransition) autoTimer += dt;
         if (autoTimer > autoTimerLimit && !manualOverride) {
             autoTimer = 0;
             vizRandomPick();

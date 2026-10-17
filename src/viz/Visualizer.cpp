@@ -1,4 +1,4 @@
-﻿//
+//
 //  Visualizer.cpp
 //
 //  Copyright (c) 2013 Charles J. Cliffe. All rights reserved.
@@ -25,6 +25,10 @@ Visualizer::Visualizer(std::string vsFn, std::string fsFn) {
     randColor[0] = randColor[1] = randColor[2] = 1.0f;
     randColor2[0] = randColor2[1] = randColor2[2] = 1.0f;
     hasSampler = false;
+    hasBackbuffer = false;
+    feedback[0].id = 0;
+    feedback[1].id = 0;
+    feedbackRead = 0;
 
     shader = LoadShader(vsFn.c_str(), fsFn.c_str());
 
@@ -47,6 +51,9 @@ Visualizer::Visualizer(std::string vsFn, std::string fsFn) {
     loc_sampleRange = GetShaderLocation(shader, "sampleRange");
     loc_blendAlpha = GetShaderLocation(shader, "blendAlpha");
     loc_samplerTex = GetShaderLocation(shader, "samplerTex");
+    loc_backbuffer = GetShaderLocation(shader, "backbuffer");
+    // A declared-but-unsampled backbuffer compiles out to -1 and renders normally.
+    hasBackbuffer = loc_backbuffer >= 0;
 
     if (loc_samplerTex >= 0) {
         Image img = GenImageColor(1024, 1, BLANK);
@@ -59,7 +66,8 @@ Visualizer::Visualizer(std::string vsFn, std::string fsFn) {
 }
 
 void Visualizer::setNamedTexture(const std::string &uniform, Texture2D tex) {
-    if (uniform == "samplerTex") {
+    // Renderer-owned samplers take no image binding.
+    if (uniform == "samplerTex" || uniform == "backbuffer") {
         return;
     }
     int loc = GetShaderLocation(shader, uniform.c_str());
@@ -222,6 +230,58 @@ void Visualizer::bindTextures()
     }
 }
 
+void Visualizer::ensureFeedback()
+{
+    // Fresh targets start cleared so feedback fades in from black; a render
+    // size change reallocates and restarts the feedback.
+    if (feedback[0].id != 0 && feedback[0].texture.width == VIZ_WIDTH && feedback[0].texture.height == VIZ_HEIGHT) {
+        return;
+    }
+    releaseFeedback();
+    feedback[0] = LoadRenderTexture(VIZ_WIDTH, VIZ_HEIGHT);
+    feedback[1] = LoadRenderTexture(VIZ_WIDTH, VIZ_HEIGHT);
+    BeginTextureMode(feedback[0]);
+    ClearBackground(BLANK);
+    EndTextureMode();
+    BeginTextureMode(feedback[1]);
+    ClearBackground(BLANK);
+    EndTextureMode();
+    feedbackRead = 0;
+}
+
+void Visualizer::releaseFeedback()
+{
+    for (int i = 0; i < 2; i++) {
+        if (feedback[i].id != 0) {
+            UnloadRenderTexture(feedback[i]);
+            feedback[i].id = 0;
+        }
+    }
+    feedbackRead = 0;
+}
+
+void Visualizer::renderFeedback()
+{
+    ensureFeedback();
+    int write = 1 - feedbackRead;
+    BeginTextureMode(feedback[write]);
+    ClearBackground(BLANK);
+    BeginShaderMode(shader);
+    // The read target stays bound while drawing into the write target, so a
+    // shader never samples the frame it is writing.
+    SetShaderValueTexture(shader, loc_backbuffer, feedback[feedbackRead].texture);
+    bindTextures();
+    DrawRectangle(0, 0, feedback[write].texture.width, feedback[write].texture.height, WHITE);
+    EndShaderMode();
+    EndTextureMode();
+    feedbackRead = write;
+}
+
+Texture2D Visualizer::feedbackTexture() const
+{
+    return feedback[feedbackRead].texture;
+}
+
 void Visualizer::unload()
 {
     if (shader.id > 0) {
@@ -232,4 +292,6 @@ void Visualizer::unload()
         UnloadTexture(samplerTexture);
         hasSampler = false;
     }
+    releaseFeedback();
+    hasBackbuffer = false;
 }

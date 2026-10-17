@@ -58,6 +58,18 @@ shaders/visuals/shadertoy/voxel_edges/tex_tex07.png
 Unknown fields are ignored, so new options can be added without breaking
 older builds. A missing or unreadable sidecar falls back to defaults.
 
+## Frame feedback (backbuffer)
+
+A shader that declares `uniform sampler2D backbuffer` samples the previous
+frame it rendered. Each such visual keeps two private render targets and
+alternates between them: the last frame is bound to `backbuffer` while the
+next frame renders into the other one, so trails and persistence accumulate.
+Buffers start cleared and are reallocated when the render size changes. Like
+`samplerTex`, `backbuffer` is owned by the renderer and takes no sidecar
+`textures` entry; tag feedback shaders with `"feedback"`. ShaderSnap renders
+a warm-up sequence for these shaders so snapshots show the accumulated
+effect.
+
 ## Controls
 
 - Left/Right arrows — previous/next shader (locks in the choice, stopping
