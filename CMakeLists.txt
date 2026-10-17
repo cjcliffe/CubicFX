@@ -150,6 +150,11 @@ target_include_directories(VizConfigTest PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(VizConfigTest PRIVATE nlohmann_json::nlohmann_json)
 add_test(NAME VizConfigTest COMMAND VizConfigTest)
 
+add_executable(FeedbackTest tests/FeedbackTest.cpp src/viz/VizConfig.cpp)
+target_include_directories(FeedbackTest PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(FeedbackTest PRIVATE nlohmann_json::nlohmann_json)
+add_test(NAME FeedbackTest COMMAND FeedbackTest)
+
 add_executable(ShaderSnap tools/shadersnap.cpp src/viz/VizConfig.cpp)
 target_include_directories(ShaderSnap PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(ShaderSnap PRIVATE raylib nlohmann_json::nlohmann_json)

@@ -47,6 +47,7 @@ int main(int argc, char **argv) {
     loc = GetShaderLocation(sh, "resolution");
     if (loc >= 0) SetShaderValue(sh, loc, res, SHADER_UNIFORM_VEC2);
     loc = GetShaderLocation(sh, "time");
+    int locTime = loc;
     if (loc >= 0) SetShaderValue(sh, loc, &t, SHADER_UNIFORM_FLOAT);
     loc = GetShaderLocation(sh, "mouse");
     if (loc >= 0) SetShaderValue(sh, loc, mouse, SHADER_UNIFORM_VEC2);
@@ -121,26 +122,57 @@ int main(int argc, char **argv) {
     }
 
     RenderTexture2D rt = LoadRenderTexture(640, 360);
-    BeginTextureMode(rt);
-    ClearBackground(BLANK);
-    BeginShaderMode(sh);
-    for (auto &b : bound) {
-        SetShaderValueTexture(sh, GetShaderLocation(sh, b.first.c_str()), b.second);
+    int locBack = GetShaderLocation(sh, "backbuffer");
+    RenderTexture2D fb[2] = { { 0 }, { 0 } };
+    int fbRead = 0;
+    int warmup = 1;
+    if (locBack >= 0) {
+        warmup = 60;
+        fb[0] = LoadRenderTexture(640, 360);
+        fb[1] = LoadRenderTexture(640, 360);
+        BeginTextureMode(fb[0]);
+        ClearBackground(BLANK);
+        EndTextureMode();
+        BeginTextureMode(fb[1]);
+        ClearBackground(BLANK);
+        EndTextureMode();
     }
-    if (hasWave) {
-        SetShaderValueTexture(sh, locWave, waveTex);
+    for (int f = 0; f < warmup; f++) {
+        if (locBack >= 0 && locTime >= 0) {
+            float ft = t - (float)(warmup - 1 - f) / 60.0f;
+            SetShaderValue(sh, locTime, &ft, SHADER_UNIFORM_FLOAT);
+        }
+        int write = (locBack >= 0) ? 1 - fbRead : 0;
+        RenderTexture2D dst = (locBack >= 0) ? fb[write] : rt;
+        BeginTextureMode(dst);
+        ClearBackground(BLANK);
+        BeginShaderMode(sh);
+        if (locBack >= 0) {
+            SetShaderValueTexture(sh, locBack, fb[fbRead].texture);
+        }
+        for (auto &b : bound) {
+            SetShaderValueTexture(sh, GetShaderLocation(sh, b.first.c_str()), b.second);
+        }
+        if (hasWave) {
+            SetShaderValueTexture(sh, locWave, waveTex);
+        }
+        DrawRectangle(0, 0, 640, 360, WHITE);
+        EndShaderMode();
+        EndTextureMode();
+        fbRead = write;
     }
-    DrawRectangle(0, 0, 640, 360, WHITE);
-    EndShaderMode();
-    EndTextureMode();
 
-    Image snap = LoadImageFromTexture(rt.texture);
+    Image snap = LoadImageFromTexture((locBack >= 0 ? fb[fbRead] : rt).texture);
     ImageFlipVertical(&snap);
     ExportImage(snap, out);
     printf("wrote %s\n", out);
 
     UnloadImage(snap);
     UnloadRenderTexture(rt);
+    if (locBack >= 0) {
+        UnloadRenderTexture(fb[0]);
+        UnloadRenderTexture(fb[1]);
+    }
     if (hasWave) {
         UnloadTexture(waveTex);
     }

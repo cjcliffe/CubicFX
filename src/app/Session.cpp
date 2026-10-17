@@ -544,6 +544,16 @@ static void buildRoster() {
 
 static void drawVizInto(RenderTexture2D rt, Visualizer *viz, float t, float dt) {
     viz->updateVariables(t, dt, sample_data, beat->vu->vu_levels, beat->contest.get());
+    if (viz->hasBackbuffer) {
+        viz->renderFeedback();
+        BeginTextureMode(rt);
+        ClearBackground(BLANK);
+        Rectangle fbSource = { 0, 0, (float)VIZ_WIDTH, -(float)VIZ_HEIGHT };
+        Rectangle fbDest = { 0, 0, (float)VIZ_WIDTH, (float)VIZ_HEIGHT };
+        DrawTexturePro(viz->feedbackTexture(), fbSource, fbDest, Vector2{ 0, 0 }, 0.0f, WHITE);
+        EndTextureMode();
+        return;
+    }
     BeginTextureMode(rt);
     ClearBackground(BLANK);
     viz->display(VIZ_WIDTH, VIZ_HEIGHT);
