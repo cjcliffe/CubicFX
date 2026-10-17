@@ -1,0 +1,6 @@
+{
+  "name": "2D LED Spectrum",
+  "author": "uNiversal",
+  "description": "LED-bar spectrum visualizer with waveform line",
+  "tags": ["led", "spectrum", "audio"]
+}

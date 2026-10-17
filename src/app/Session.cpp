@@ -574,9 +574,16 @@ static void applyWindowMode(const SetupChoice &choice) {
 
 // ---- Browser overlay drawing ----
 
-static const char *targetName() {
+static std::string targetLabel() {
     int i = rosterIndexOf(targetViz);
-    return (i >= 0) ? roster[i].config.name.c_str() : "";
+    if (i < 0) {
+        return "";
+    }
+    std::string label = roster[i].config.name;
+    if (!roster[i].config.author.empty()) {
+        label += " by " + roster[i].config.author;
+    }
+    return label;
 }
 
 static void drawBrowser() {
@@ -818,9 +825,11 @@ bool runVisualizer(SetupChoice &choice)
 
         if (!browserOpen) {
             float age = (float)(GetTime() - lastVizChange);
-            if (age < 3.0f) {
-                float a = 0.55f * (age < 2.0f ? 1.0f : (3.0f - age));
-                DrawText(targetName(), 12, (int)scrH - 28, 20, ColorAlpha(WHITE, a));
+            if (age < 5.0f) {
+                float a = 0.7f * (age < 4.0f ? 1.0f : (5.0f - age));
+                std::string label = targetLabel();
+                DrawText(label.c_str(), 14, (int)scrH - 26, 20, ColorAlpha(BLACK, a));
+                DrawText(label.c_str(), 12, (int)scrH - 28, 20, ColorAlpha(WHITE, a));
             }
         }
         drawBrowser();
