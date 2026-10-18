@@ -15,7 +15,7 @@ Many shaders are derivatives of ShaderToy or the old glsl.heroku site and may no
 
 - CMake 3.16 or newer
 - A C++17 compiler (Visual Studio 2022 on Windows)
-- Internet access at configure time — raylib, RtAudio, and raygui are fetched automatically
+- Internet access at configure time — raylib, RtAudio, Dear ImGui, and rlImGui are fetched automatically
 - An audio input device (microphone, line-in, or "stereo mix") for the visuals to react to
 
 ## Build
@@ -26,7 +26,7 @@ cmake --build build --config Release
 ```
 
 Pinned dependencies (see `CMakeLists.txt`): raylib 6.0, RtAudio 6.0.1,
-nlohmann/json 3.11.3, and raygui (tracking master, header-only),
+nlohmann/json 3.11.3, Dear ImGui 1.92.7, and rlImGui (Raylib_6_0 branch),
 fetched with shallow clones. No vendored libraries or external checkouts required.
 
 ## Tests
