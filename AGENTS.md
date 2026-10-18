@@ -21,7 +21,7 @@ CMake-based (minimum 3.16, C++17). See `CMakeLists.txt` for build configuration.
 ## Verification
 
 - Configure, build, and test via CMake: `cmake -S . -B build`, `cmake --build build --config Release`, `ctest --test-dir build -C Release`
-- Snapshot a shader from the build directory (binaries land at the build root, and relative asset paths must resolve): `.\ShaderSnap.exe shaders/visuals/shadertoy/circle_pattern.fs snap.png [linear|point] [time]`
+- Snapshot a shader from the build directory (binaries land at the build root, and relative asset paths must resolve): `.\tools\ShaderSnap.exe shaders/visuals/shadertoy/circle_pattern.fs snap.png [linear|point] [time]`
 
 ## Conventions
 

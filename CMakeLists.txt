@@ -154,25 +154,37 @@ endif ()
 target_link_libraries(CubicFX PRIVATE raylib rtaudio nlohmann_json::nlohmann_json imgui)
 
 enable_testing()
-add_executable(VizConfigTest tests/VizConfigTest.cpp src/viz/VizConfig.cpp)
-target_include_directories(VizConfigTest PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+# Test and helper-tool binaries go to subfolders so the build root stays
+# uncluttered (CubicFX plus the copied shaders/images/overlay/fonts dirs).
+# CTest still runs from the build root so relative asset paths resolve.
+function(add_cubicfx_test name)
+    add_executable(${name} ${ARGN})
+    target_include_directories(${name} PRIVATE ${PROJECT_SOURCE_DIR}/src)
+    set_target_properties(${name} PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG ${PROJECT_BINARY_DIR}/tests
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE ${PROJECT_BINARY_DIR}/tests
+        FOLDER tests)
+    add_test(NAME ${name} COMMAND ${name} WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
+endfunction()
+
+add_cubicfx_test(VizConfigTest tests/VizConfigTest.cpp src/viz/VizConfig.cpp)
 target_link_libraries(VizConfigTest PRIVATE nlohmann_json::nlohmann_json)
-add_test(NAME VizConfigTest COMMAND VizConfigTest)
 
-add_executable(FeedbackTest tests/FeedbackTest.cpp src/viz/VizConfig.cpp)
-target_include_directories(FeedbackTest PRIVATE ${PROJECT_SOURCE_DIR}/src)
+add_cubicfx_test(FeedbackTest tests/FeedbackTest.cpp src/viz/VizConfig.cpp)
 target_link_libraries(FeedbackTest PRIVATE nlohmann_json::nlohmann_json)
-add_test(NAME FeedbackTest COMMAND FeedbackTest)
 
-add_executable(TransitionTest tests/TransitionTest.cpp)
-target_include_directories(TransitionTest PRIVATE ${PROJECT_SOURCE_DIR}/src)
-add_test(NAME TransitionTest COMMAND TransitionTest)
+add_cubicfx_test(TransitionTest tests/TransitionTest.cpp)
 
-add_executable(AudioSliceTest tests/AudioSliceTest.cpp)
-target_include_directories(AudioSliceTest PRIVATE ${PROJECT_SOURCE_DIR}/src)
-add_test(NAME AudioSliceTest COMMAND AudioSliceTest)
+add_cubicfx_test(AudioSliceTest tests/AudioSliceTest.cpp)
 
 add_executable(ShaderSnap tools/shadersnap.cpp src/viz/VizConfig.cpp)
 target_include_directories(ShaderSnap PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(ShaderSnap PRIVATE raylib nlohmann_json::nlohmann_json)
+set_target_properties(ShaderSnap PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tools
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG ${PROJECT_BINARY_DIR}/tools
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE ${PROJECT_BINARY_DIR}/tools
+    FOLDER tools)
 
