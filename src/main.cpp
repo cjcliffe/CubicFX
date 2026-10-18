@@ -5,6 +5,8 @@
 
 #include <raylib.h>
 
+#include "rlImGui.h"
+
 #include "audio/AudioCapture.h"
 #include "ui/SetupDialog.h"
 #include "ui/UiStyle.h"
@@ -13,7 +15,9 @@
 using namespace std;
 
 // Entry point: list audio devices, open the window on the setup dialog,
-// then alternate dialog/visualizer sessions until quit.
+// then alternate dialog/visualizer sessions until quit. Dear ImGui (via
+// rlImGui) is set up once here and only draws inside runSetupDialog; the
+// visualizer session renders plain raylib frames.
 int main()
 {
     vector<AudioDevInfo> audioDevs = listInputDevices();
@@ -67,7 +71,9 @@ int main()
     SetTargetFPS(60);
     SetExitKey(0);
 
+    rlImGuiBeginInitImGui();
     applyUiStyle();
+    rlImGuiEndInitImGui();
 
     while (true) {
         if (!runSetupDialog(choice, audioDevs)) {
@@ -85,6 +91,7 @@ int main()
     }
 
     printf("\n-----\nDone.\n");
+    rlImGuiShutdown();
     CloseWindow();
 
     return 0;

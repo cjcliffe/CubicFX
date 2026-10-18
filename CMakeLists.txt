@@ -81,22 +81,36 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE
 )
 FetchContent_Declare(
-    raygui
-    GIT_REPOSITORY https://github.com/raysan5/raygui.git
-    GIT_TAG master
-    GIT_SHALLOW TRUE
-)
-FetchContent_Declare(
     nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
     GIT_TAG v3.11.3
     GIT_SHALLOW TRUE
 )
-FetchContent_MakeAvailable(raylib rtaudio nlohmann_json)
-FetchContent_GetProperties(raygui)
-if(NOT raygui_POPULATED)
-    FetchContent_Populate(raygui)
-endif()
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG v1.92.7
+    GIT_SHALLOW TRUE
+)
+FetchContent_Declare(
+    rlimgui
+    GIT_REPOSITORY https://github.com/raylib-extras/rlImGui.git
+    GIT_TAG Raylib_6_0
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(raylib rtaudio nlohmann_json imgui rlimgui)
+
+# Dear ImGui sources plus the rlImGui raylib backend, built once as a
+# static library. rlImGui's Raylib_6_0 branch pairs with ImGui 1.92.7.
+add_library(imgui STATIC
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${rlimgui_SOURCE_DIR}/rlImGui.cpp
+)
+target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR} ${rlimgui_SOURCE_DIR})
+target_link_libraries(imgui PUBLIC raylib)
 
 SET (cubicfx_sources
     src/main.cpp
@@ -119,7 +133,6 @@ SET (cubicfx_headers
     src/beat/BeatDetektor.h
     src/ui/SetupDialog.h
     src/ui/UiStyle.h
-    src/ui/Flex.h
     src/viz/Visualizer.h
     src/viz/VizConfig.h
 )
@@ -132,20 +145,15 @@ configure_files(${PROJECT_SOURCE_DIR}/fonts ${PROJECT_BINARY_DIR}/fonts COPYONLY
 
 add_executable(CubicFX ${cubicfx_sources} ${cubicfx_headers})
 
-target_include_directories(CubicFX PRIVATE ${PROJECT_SOURCE_DIR}/src ${raygui_SOURCE_DIR}/src)
+target_include_directories(CubicFX PRIVATE ${PROJECT_SOURCE_DIR}/src ${imgui_SOURCE_DIR} ${rlimgui_SOURCE_DIR})
 
 if (MSVC)
     target_compile_definitions(CubicFX PRIVATE _USE_MATH_DEFINES)
 endif ()
 
-target_link_libraries(CubicFX PRIVATE raylib rtaudio nlohmann_json::nlohmann_json)
+target_link_libraries(CubicFX PRIVATE raylib rtaudio nlohmann_json::nlohmann_json imgui)
 
 enable_testing()
-add_executable(FlexTest tests/FlexTest.cpp)
-target_include_directories(FlexTest PRIVATE ${PROJECT_SOURCE_DIR}/src)
-target_link_libraries(FlexTest PRIVATE raylib)
-add_test(NAME FlexTest COMMAND FlexTest)
-
 add_executable(VizConfigTest tests/VizConfigTest.cpp src/viz/VizConfig.cpp)
 target_include_directories(VizConfigTest PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(VizConfigTest PRIVATE nlohmann_json::nlohmann_json)
@@ -167,5 +175,4 @@ add_test(NAME AudioSliceTest COMMAND AudioSliceTest)
 add_executable(ShaderSnap tools/shadersnap.cpp src/viz/VizConfig.cpp)
 target_include_directories(ShaderSnap PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(ShaderSnap PRIVATE raylib nlohmann_json::nlohmann_json)
-
 

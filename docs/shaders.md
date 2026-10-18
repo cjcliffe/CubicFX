@@ -16,17 +16,17 @@ the shader name. Shaders without a sidecar use defaults (display name derived
 from the file name, no image textures, normal random weight).
 
 ```
-shaders/visuals/shadertoy/voxel_edges/voxel_edges.fs
-shaders/visuals/shadertoy/voxel_edges/voxel_edges.json
-shaders/visuals/shadertoy/voxel_edges/tex_tex06.png
-shaders/visuals/shadertoy/voxel_edges/tex_tex07.png
+shaders/visuals/shadertoy/neon_grid/neon_grid.fs
+shaders/visuals/shadertoy/neon_grid/neon_grid.json
+shaders/visuals/shadertoy/neon_grid/tex_tex06.png
+shaders/visuals/shadertoy/neon_grid/tex_tex07.png
 ```
 
 ```json
 {
-  "name": "Voxel Edges",
-  "author": "inigo quilez",
-  "tags": ["voxel", "raymarch"],
+  "name": "Neon Grid",
+  "author": "Example Author",
+  "tags": ["grid", "neon"],
   "textures": {
     "tex0": "tex_noise2.png",
     "tex1": "tex_tex07.png",

@@ -1,15 +1,16 @@
+#include <cfloat>
 #include <cstdio>
 #include <string>
 #include <vector>
 
 #include <raylib.h>
 
-#define RAYGUI_IMPLEMENTATION
-#include <raygui.h>
+#include "imgui.h"
+#include "rlImGui.h"
 
-#include "Flex.h"
 #include "audio/AudioCapture.h"
 #include "ui/SetupDialog.h"
+#include "ui/UiStyle.h"
 
 using namespace std;
 
@@ -85,18 +86,28 @@ static string shortName(const string &name, size_t maxLen) {
     return name.substr(0, maxLen - 3) + "...";
 }
 
-// Setup dialog widgets are drawn with raygui (see runSetupDialog).
+// Full-width toggle button in the old setup style: the active choice renders
+// in the sky-blue accent with dark text, the rest as plain buttons.
+static bool toggleButton(const char *label, bool active, const ImVec2 &size) {
+    if (active) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.40f, 0.75f, 1.00f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.48f, 0.80f, 1.00f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.33f, 0.68f, 0.95f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
+    }
+    bool clicked = ImGui::Button(label, size);
+    if (active) {
+        ImGui::PopStyleColor(4);
+    }
+    return clicked;
+}
 
-// Modal setup loop on the already-open window. Sections top to bottom:
-// monitor, windowed/fullscreen, resolution grid (rebuilt per monitor),
-// scrollable audio list with test-tone/auto-gain/refresh, Start. Enter
-// starts, Esc or window-close cancels (returns false).
-// Widgets are raygui controls (GuiLabel/GuiButton/GuiToggleGroup/
-// GuiCheckBox/GuiListViewEx).
+// Modal setup loop on the already-open window, drawn with Dear ImGui through
+// the rlImGui backend. Sections top to bottom: monitor buttons, vsync plus
+// windowed/fullscreen buttons, resolution button grid (rebuilt per monitor),
+// audio options with a scrollable device list, then Start. Enter starts,
+// Esc or window-close cancels (returns false).
 bool runSetupDialog(SetupChoice &choice, vector<AudioDevInfo> &audioDevs) {
-    const int dlgW = DIALOG_W;
-    const int dlgH = DIALOG_H;
-
     int monitorCount = GetMonitorCount();
     if (choice.monitor < 0 || choice.monitor >= monitorCount) {
         choice.monitor = 0;
@@ -110,149 +121,89 @@ bool runSetupDialog(SetupChoice &choice, vector<AudioDevInfo> &audioDevs) {
 
     bool done = false;
     bool cancelled = false;
-    int listScroll = 0;
     int listActive = choice.audioIndex;
-    int listFocus = -1;
-    int modeActive = choice.fullscreen ? 1 : 0;
-
 
     while (!WindowShouldClose() && !done && !cancelled) {
-        if (IsKeyPressed(KEY_ENTER)) {
+        if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER)) {
             done = true;
         }
         if (IsKeyPressed(KEY_ESCAPE)) {
             cancelled = true;
         }
 
-        const float margin = 16.0f;
-        const float contentW = (float)dlgW - 32.0f;
-        const float listBottom = (float)dlgH - 96.0f;
-
-        int shown = monitorCount < 4 ? monitorCount : 4;
-        int resRows = ((int)presets.size() + 3) / 4;
-        if (resRows < 1) {
-            resRows = 1;
-        }
-        float monitorH = 0.0f;
-        if (shown > 0) {
-            monitorH = (float)(shown * 30 + (shown - 1) * 8);
-        }
-        float gridH = 0.0f;
-        if (!presets.empty()) {
-            gridH = (float)(resRows * 30 + (resRows - 1) * 8);
-        }
-
-        Flex col;
-        col.dir = FlexDir::Column;
-        col.bounds = Rectangle{ margin, 12.0f, contentW, listBottom - 12.0f };
-        col.gap = 6.0f;
-        col.addFixed(34.0f);
-        col.addFixed(24.0f);
-        col.addFixed(monitorH);
-        col.addFixed(24.0f);
-        col.addFixed(30.0f);
-        col.addFixed(24.0f);
-        col.addFixed(gridH);
-        if (choice.fullscreen) {
-            col.addFixed(24.0f);
-        }
-        col.addFixed(26.0f);
-        if (audioDevs.empty()) {
-            col.addFixed(24.0f);
-        } else {
-            col.addGrow(1.0f);
-        }
-        col.layout();
-
-        size_t k = 0;
         BeginDrawing();
         ClearBackground(BLACK);
+        rlImGuiBegin();
 
-        GuiSetStyle(DEFAULT, TEXT_SIZE, 28);
-        GuiLabel(col.at(k++), "CubicFX Setup");
-        GuiSetStyle(DEFAULT, TEXT_SIZE, 20);
+        ImGuiIO &io = ImGui::GetIO();
+        ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+        ImGui::SetNextWindowSize(io.DisplaySize);
+        ImGuiWindowFlags hostFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
+        if (ImGui::Begin("CubicFX Setup", nullptr, hostFlags)) {
+            if (ImFont *title = uiTitleFont()) {
+                ImGui::PushFont(title);
+            }
+            ImGui::Text("CubicFX Setup");
+            if (uiTitleFont()) {
+                ImGui::PopFont();
+            }
 
-        GuiLabel(col.at(k++), "Display monitor:");
-        {
-            Rectangle r = col.at(k++);
-            string group;
-            for (int m = 0; m < shown; m++) {
+            ImGui::SeparatorText("Display monitor");
+            for (int m = 0; m < monitorCount; m++) {
                 char label[160];
                 snprintf(label, sizeof(label), "%d: %s (%dx%d)", m + 1,
                     shortName(GetMonitorName(m), 34).c_str(),
                     GetMonitorWidth(m), GetMonitorHeight(m));
-                if (m > 0) {
-                    group += "\n";
-                }
-                group += label;
-            }
-            if (!group.empty()) {
-                int prevMonitor = choice.monitor;
-                if (GuiToggleGroup(Rectangle{ r.x, r.y, r.width, 30.0f }, group.c_str(), &choice.monitor)) {
-                    if (choice.monitor < 0 || choice.monitor >= shown) {
-                        choice.monitor = prevMonitor;
-                    }
-                }
-                if (choice.monitor != prevMonitor) {
+                ImGui::PushID(m);
+                if (toggleButton(label, choice.monitor == m, ImVec2(-FLT_MIN, 0.0f))) {
+                    choice.monitor = m;
                     presets = buildResPresets(choice.monitor);
                     resolvePresetChoice(choice, presets);
                 }
+                ImGui::PopID();
             }
-        }
 
-        {
-            Rectangle r = col.at(k++);
-            GuiLabel(Rectangle{ r.x, r.y, 80.0f, 24.0f }, "Mode:");
-            GuiCheckBox(Rectangle{ r.x + 84.0f, r.y + 2.0f, 20.0f, 20.0f }, "VSync", &choice.vsync);
-        }
-        {
-            Rectangle r = col.at(k++);
-            float bw = (r.width - 8.0f) / 2.0f;
-            modeActive = choice.fullscreen ? 1 : 0;
-            if (GuiToggleGroup(Rectangle{ r.x, r.y, bw, 30.0f }, "Windowed;Fullscreen", &modeActive)) {
-                choice.fullscreen = (modeActive == 1);
-            }
-        }
-
-        GuiLabel(col.at(k++), "Resolution:");
-        {
-            Rectangle r = col.at(k++);
-            float bw = (r.width - 3.0f * 8.0f) / 4.0f;
-            string group;
-            for (int i = 0; i < (int)presets.size(); i++) {
-                char label[32];
-                snprintf(label, sizeof(label), "%dx%d", presets[i].width, presets[i].height);
-                if (i > 0) {
-                    group += (i % 4 == 0) ? "\n" : ";";
+            ImGui::SeparatorText("Mode");
+            ImGui::Checkbox("VSync", &choice.vsync);
+            {
+                float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) / 2.0f;
+                if (toggleButton("Windowed", !choice.fullscreen, ImVec2(half, 0.0f))) {
+                    choice.fullscreen = false;
                 }
-                group += label;
-            }
-            if (!group.empty()) {
-                int prevPreset = choice.resPreset;
-                GuiToggleGroup(Rectangle{ r.x, r.y, bw, 30.0f }, group.c_str(), &choice.resPreset);
-                if (choice.resPreset != prevPreset && choice.resPreset >= 0 && choice.resPreset < (int)presets.size()) {
-                    choice.width = presets[choice.resPreset].width;
-                    choice.height = presets[choice.resPreset].height;
-                }
-                if (choice.resPreset < -1 || choice.resPreset >= (int)presets.size()) {
-                    choice.resPreset = prevPreset;
+                ImGui::SameLine();
+                if (toggleButton("Fullscreen", choice.fullscreen, ImVec2(half, 0.0f))) {
+                    choice.fullscreen = true;
                 }
             }
-        }
-        if (choice.fullscreen) {
-            Rectangle r = col.at(k++);
-            char label[160];
-            snprintf(label, sizeof(label), "Fullscreen renders chosen res, upscaled to %dx%d",
-                GetMonitorWidth(choice.monitor), GetMonitorHeight(choice.monitor));
-            GuiLabel(r, label);
-        }
 
-        {
-            Rectangle r = col.at(k++);
-            GuiLabel(Rectangle{ r.x, r.y, 120.0f, 24.0f }, "Audio input:");
-            GuiCheckBox(Rectangle{ r.x + 134.0f, r.y + 2.0f, 20.0f, 20.0f }, "Test tone", &choice.testTone);
-            GuiCheckBox(Rectangle{ r.x + r.width - 268.0f, r.y + 2.0f, 20.0f, 20.0f }, "Auto Gain", &choice.agc);
-            if (GuiButton(Rectangle{ r.x + r.width - 100.0f, r.y, 100.0f, 26.0f }, "Refresh")) {
+            ImGui::SeparatorText("Resolution");
+            if (ImGui::BeginTable("##res", 4)) {
+                for (int i = 0; i < (int)presets.size(); i++) {
+                    ImGui::TableNextColumn();
+                    char label[32];
+                    snprintf(label, sizeof(label), "%dx%d", presets[i].width, presets[i].height);
+                    ImGui::PushID(i);
+                    if (toggleButton(label, choice.resPreset == i, ImVec2(-FLT_MIN, 0.0f))) {
+                        choice.resPreset = i;
+                        choice.width = presets[i].width;
+                        choice.height = presets[i].height;
+                    }
+                    ImGui::PopID();
+                }
+                ImGui::EndTable();
+            }
+            if (choice.fullscreen) {
+                ImGui::TextDisabled("Fullscreen renders chosen res, upscaled to %dx%d",
+                    GetMonitorWidth(choice.monitor), GetMonitorHeight(choice.monitor));
+            }
+
+            ImGui::SeparatorText("Audio input");
+            ImGui::Checkbox("Test tone", &choice.testTone);
+            ImGui::SameLine();
+            ImGui::Checkbox("Auto Gain", &choice.agc);
+            ImGui::SameLine(ImGui::GetWindowWidth() - 116.0f);
+            if (ImGui::Button("Refresh", ImVec2(100.0f, 0.0f))) {
                 unsigned int keepId = choice.audioDevice;
                 audioDevs = listInputDevices();
                 choice.audioIndex = -1;
@@ -267,53 +218,56 @@ bool runSetupDialog(SetupChoice &choice, vector<AudioDevInfo> &audioDevs) {
                 }
                 choice.audioDevice = audioDevs.empty() ? 0 : audioDevs[choice.audioIndex].id;
                 listActive = choice.audioIndex;
-                listScroll = 0;
-                listFocus = -1;
             }
-        }
-        if (audioDevs.empty()) {
-            GuiLabel(col.at(k++), "No audio devices found.");
-        } else {
-            Rectangle panel = col.at(k++);
-            vector<string> labels;
-            labels.reserve(audioDevs.size());
-            for (auto &d : audioDevs) {
-                char buf[160];
-                bool isDefault = d.isLoopback ? d.isDefaultOutput : d.isDefaultInput;
-                if (d.isLoopback) {
-                    snprintf(buf, sizeof(buf), "[Desktop] %s (%uch)%s", shortName(d.name, 32).c_str(), d.inChannels,
-                        isDefault ? " *" : "");
-                } else {
-                    snprintf(buf, sizeof(buf), "%s (%uch)%s", shortName(d.name, 40).c_str(), d.inChannels,
-                        isDefault ? " *" : "");
+
+            if (audioDevs.empty()) {
+                ImGui::Text("No audio devices found.");
+            } else {
+                vector<string> labels;
+                labels.reserve(audioDevs.size());
+                for (auto &d : audioDevs) {
+                    char buf[160];
+                    bool isDefault = d.isLoopback ? d.isDefaultOutput : d.isDefaultInput;
+                    if (d.isLoopback) {
+                        snprintf(buf, sizeof(buf), "[Desktop] %s (%uch)%s", shortName(d.name, 32).c_str(),
+                            d.inChannels, isDefault ? " *" : "");
+                    } else {
+                        snprintf(buf, sizeof(buf), "%s (%uch)%s", shortName(d.name, 40).c_str(), d.inChannels,
+                            isDefault ? " *" : "");
+                    }
+                    labels.push_back(buf);
                 }
-                labels.push_back(buf);
+                if (listActive < 0 || listActive >= (int)labels.size()) {
+                    listActive = choice.audioIndex;
+                }
+                // Fill the width and stretch down to the footer, so no dead
+                // space remains at the dialog bottom.
+                if (ImGui::BeginListBox("##audiodevs", ImVec2(-FLT_MIN, -96.0f))) {
+                    for (int i = 0; i < (int)labels.size(); i++) {
+                        bool selected = (listActive == i);
+                        if (ImGui::Selectable(labels[i].c_str(), selected)) {
+                            listActive = i;
+                            choice.audioIndex = i;
+                            choice.audioDevice = audioDevs[i].id;
+                        }
+                        if (selected) {
+                            ImGui::SetItemDefaultFocus();
+                        }
+                    }
+                    ImGui::EndListBox();
+                }
             }
-            vector<char *> ptrs;
-            ptrs.reserve(labels.size());
-            for (auto &s : labels) {
-                ptrs.push_back(s.data());
-            }
-            if (listActive < 0 || listActive >= (int)ptrs.size()) {
-                listActive = choice.audioIndex;
-            }
-            int prevActive = listActive;
-            GuiListViewEx(panel, ptrs.data(), (int)ptrs.size(), &listScroll, &listActive, &listFocus);
-            if (listActive != prevActive && listActive >= 0 && listActive < (int)audioDevs.size()) {
-                choice.audioIndex = listActive;
-                choice.audioDevice = audioDevs[listActive].id;
+
+            ImGui::TextDisabled("Enter = Start    Esc = Quit");
+            if (ImGui::Button("Start", ImVec2(-FLT_MIN, 36.0f))) {
+                done = true;
             }
         }
+        ImGui::End();
 
-        if (GuiButton({ 16, (float)dlgH - 52, (float)dlgW - 32, 36 }, "Start")) {
-            done = true;
-        }
-        GuiLabel({ 16, (float)dlgH - 78, 400, 24 }, "Enter = Start    Esc = Quit");
-
+        rlImGuiEnd();
         EndDrawing();
     }
 
     return done;
 }
-
-

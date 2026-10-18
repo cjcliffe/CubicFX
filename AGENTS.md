@@ -6,13 +6,13 @@ This is a C++ OpenGL shader-based music visualizer (CubicFX, CMake project/execu
 
 CMake-based (minimum 3.16, C++17). See `CMakeLists.txt` for build configuration.
 
-- Dependencies are fetched at configure time via `FetchContent` (shallow clones): raylib 6.0 for window/input/rendering and RtAudio 6.0.1 for audio input (WASAPI on Windows). No vendored libraries or external checkouts
+- Dependencies are fetched at configure time via `FetchContent` (shallow clones): raylib 6.0 for window/input/rendering, Dear ImGui 1.92.7 + rlImGui (Raylib_6_0 branch) for the setup dialog and RtAudio 6.0.1 for audio input (WASAPI on Windows). No vendored libraries or external checkouts
 - Runtime assets are copied to the build directory: `shaders/` and `images/` — run the executable from the build directory so relative asset paths resolve
 - On MSVC the target defines `_USE_MATH_DEFINES`; `CubicFX.cpp` defines `NOMINMAX`/`NOGDI`/`NOUSER` before including Windows headers (via RtAudio) to avoid collisions with raylib names like `Rectangle`
 
 ## Key Directories
 
-- `src/` — Application source: `main.cpp` (entry, setup/session loop), `app/` (visualizer session: roster, keyboard control, render-texture transitions), `audio/` (RtAudio capture handed to the render thread under a mutex, `FFT.h`), `beat/` (beat-detection glue plus `BeatDetektor.*`), `ui/` (setup dialog, global raygui theme, `Flex.h`), `viz/` (`Visualizer.cpp/.h`, raylib shader wrapper and per-frame uniforms)
+- `src/` — Application source: `main.cpp` (entry, setup/session loop), `app/` (visualizer session: roster, keyboard control, render-texture transitions), `audio/` (RtAudio capture handed to the render thread under a mutex, `FFT.h`), `beat/` (beat-detection glue plus `BeatDetektor.*`), `ui/` (ImGui setup dialog and theme), `viz/` (`Visualizer.cpp/.h`, raylib shader wrapper and per-frame uniforms)
 - `shaders/` — Shared `vertex_common.vs` (raylib-style, transforms by the `mvp` uniform); `visuals/` holds roster shaders in per-collection subfolders with sidecar `.json` config; `system/` holds compositor effects; `unused/` stages unadapted shaders. Audio-waveform samplers are `sampler2D` backed by a 1024x1 float texture, not `sampler1D`
 - `images/` — Shared noise/texture inputs loaded at runtime
 - `overlay/` — Overlay images; the first 9 files in natural-sort order fill the Shift+1..9 slots
